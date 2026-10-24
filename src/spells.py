@@ -9,6 +9,7 @@ from typing import Protocol
 from src.constants import BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE, TILE_SIZE
 from src.entities import EnemySnapshot
 from src.states import GameState
+from src.statuses import StatusEffect
 
 
 class SpellId(Enum):
@@ -74,6 +75,8 @@ class SpellFailure(Enum):
     INVALID_ACTION_ID = "Spell action ID must be a nonempty string"
     ALREADY_COMMITTED = "This spell action was already committed"
     UNSUPPORTED_EFFECT = "Only Fire, Starstorm, and Meteor have offensive effects"
+    UNSUPPORTED_SUPPORT_EFFECT = "This executor supports only the five support spells"
+    RERAISE_USED = "Reraise has already been cast in this encounter"
 
 
 @dataclass(frozen=True)
@@ -90,6 +93,8 @@ class SpellContext:
     player_position: tuple[int, int]
     enemies: tuple[EnemySnapshot, ...]
     action_pending: bool = False
+    statuses: tuple[StatusEffect, ...] = ()
+    reraise_used: bool = False
 
 
 @dataclass(frozen=True)
@@ -181,10 +186,13 @@ class SpellEngine:
         definition = get_spell(spell_id)
         if definition is None:
             return SpellResult(failure=SpellFailure.INVALID_SPELL)
-        if context.state is not GameState.PLAYER_AIM or context.action_pending:
+        if (context.state is not GameState.PLAYER_AIM or context.action_pending
+                or context.hp <= 0):
             return SpellResult(failure=SpellFailure.INVALID_STATE)
         if context.stage < definition.unlock_stage:
             return SpellResult(failure=SpellFailure.STAGE_LOCKED)
+        if definition.spell_id is SpellId.RERAISE and context.reraise_used:
+            return SpellResult(failure=SpellFailure.RERAISE_USED)
         if context.mp < definition.mp_cost:
             return SpellResult(failure=SpellFailure.INSUFFICIENT_MP)
         if context.turn_index < self.next_ready_turn(definition.spell_id):

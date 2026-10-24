@@ -21,6 +21,8 @@ from src.entities import (
 from src.turns import resolve_enemy_phase
 from src.spells import SpellContext, SpellEngine, SpellId, SpellResult, StatusCheck
 from src.offensive_spells import OffensiveSpellResult, execute_offensive
+from src.statuses import StatusEffect, StatusState
+from src.support_spells import SupportSpellResult, execute_support
 
 
 # Action eligibility is checked by the controller before requesting scene edges.
@@ -72,6 +74,8 @@ class WorldSnapshot:
     game_over_reason: GameOverReason | None
     spawned_waves: int
     total_waves: int
+    statuses: tuple[StatusEffect, ...] = ()
+    reraise_used: bool = False
 
 
 class World:
@@ -123,6 +127,8 @@ class World:
         self.hp = self.max_hp = 100
         self.mp = self.max_mp = 100
         self.spells = SpellEngine()
+        self.statuses = StatusState()
+        self.reraise_used = False
         self.bp = 1
         self.player_row = INITIAL_PLAYER_ROW
         self.aim_target: tuple[float, float] | None = None
@@ -262,6 +268,7 @@ class World:
             player_row=snapshot.player_row, player_position=snapshot.player_position,
             enemies=snapshot.enemies,
             action_pending=bool(self.projectiles) or self._pending_turn is not None,
+            statuses=snapshot.statuses, reraise_used=snapshot.reraise_used,
         )
 
     def validate_spell(self, spell_id: SpellId | str, *,
@@ -278,6 +285,11 @@ class World:
         """Model-only commit/effects; main-action claiming and turns remain deferred."""
         return execute_offensive(action_id, spell_id, self, self.spells, self.combat,
                                  status_check=status_check)
+
+    def execute_support_spell(self, action_id: str, spell_id: SpellId | str, *,
+                              status_check: StatusCheck | None = None) -> SupportSpellResult:
+        """Model-only healing, cleansing, or grants; no status/turn processing."""
+        return execute_support(action_id, spell_id, self, self.spells, status_check=status_check)
 
     def apply_player_damage(self, amount: int) -> int:
         """Apply a gameplay damage event and return actual HP lost after clamping."""
@@ -364,4 +376,6 @@ class World:
             game_over_reason=self.game_over_reason,
             spawned_waves=len(self.encounter.spawned_waves) if self.encounter else 0,
             total_waves=len(self.encounter.definition.waves) if self.encounter else 0,
+            statuses=self.statuses.snapshot(),
+            reraise_used=self.reraise_used,
         )
