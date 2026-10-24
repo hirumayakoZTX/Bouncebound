@@ -21,15 +21,22 @@ class Renderer:
             self._center_text(screen, "Escape: Quit", 350)
         elif snapshot.state is GameState.STAGE_INTRO:
             self._center_text(screen, f"Stage {snapshot.stage}", 240, heading=True)
+            if snapshot.total_waves:
+                self._center_text(screen, f"Prototype: {snapshot.total_waves} scripted waves", 285)
             self._center_text(screen, "Enter: Continue", 320)
-        elif snapshot.state is GameState.GAME_OVER:
-            self._center_text(screen, "Game Over", 220, heading=True)
+        elif snapshot.state in (GameState.GAME_OVER, GameState.STAGE_CLEAR):
+            cleared = snapshot.state is GameState.STAGE_CLEAR
+            self._center_text(screen, "Stage Clear" if cleared else "Game Over", 190, heading=True)
+            reason = ("Prototype encounter complete" if cleared
+                      else snapshot.game_over_reason.value if snapshot.game_over_reason
+                      else "Player HP depleted" if snapshot.hp <= 0 else "Run ended")
+            self._center_text(screen, reason, 240)
             self._center_text(screen, f"Stage {snapshot.stage} | Turn {snapshot.turn_index}", 280)
             self._center_text(
                 screen, f"HP {snapshot.hp}/{snapshot.max_hp} | "
                 f"MP {snapshot.mp}/{snapshot.max_mp} | BP {snapshot.bp}", 320,
             )
-            self._center_text(screen, "Close the window to exit", 380)
+            self._center_text(screen, "Press R to Restart", 380)
         elif snapshot.state in ACTIVE_STATES or snapshot.state is GameState.PAUSED:
             self._draw_battlefield(screen, snapshot)
             if snapshot.state is GameState.PAUSED:
@@ -46,7 +53,9 @@ class Renderer:
 
     def _draw_battlefield(self, screen: pygame.Surface, snapshot: WorldSnapshot) -> None:
         self._center_text(
-            screen, f"Stage {snapshot.stage}    Turn {snapshot.turn_index}", 32
+            screen, f"Stage {snapshot.stage}    Turn {snapshot.turn_index}"
+            + (f"    Waves {snapshot.spawned_waves}/{snapshot.total_waves}"
+               if snapshot.total_waves else ""), 32
         )
         arena = pygame.Rect(BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE)
         pygame.draw.rect(screen, (30, 43, 63), arena)

@@ -32,6 +32,7 @@ class TurnIntegrationTests(unittest.TestCase):
 
     def test_application_loop_completes_three_real_shots_without_extra_phases(self) -> None:
         game = Game()
+        game.world = World(demo=True)
         events = [[self.key(pygame.K_RETURN)], [self.key(pygame.K_RETURN)],
                   [self.key(pygame.K_w)] * 3]
         for _ in range(3):
@@ -98,7 +99,7 @@ class TurnIntegrationTests(unittest.TestCase):
         events = [[self.key(pygame.K_RETURN)], [self.key(pygame.K_RETURN)],
                   [self.key(pygame.K_w)] * 3 + [self.click()], [], [],
                   [self.click(), self.key(pygame.K_w), self.key(pygame.K_RETURN),
-                   self.key(pygame.K_ESCAPE), self.key(pygame.K_r)], [],
+                   self.key(pygame.K_ESCAPE)], [],
                   [pygame.event.Event(pygame.QUIT)]]
         clock = Mock()
         clock.tick.return_value = 100

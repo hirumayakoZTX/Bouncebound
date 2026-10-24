@@ -106,7 +106,10 @@ class SceneTests(unittest.TestCase):
             with self.subTest(state=state):
                 game = self.game_in_state(state)
                 before = deepcopy(vars(game.world))
-                for key in (pygame.K_SPACE, pygame.K_1, pygame.K_r):
+                keys = (pygame.K_SPACE, pygame.K_1)
+                if state not in (GameState.GAME_OVER, GameState.STAGE_CLEAR):
+                    keys += (pygame.K_r,)
+                for key in keys:
                     game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
                 game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1))
                 self.assertEqual(vars(game.world), before)

@@ -3,16 +3,18 @@
 from dataclasses import dataclass
 from math import isfinite
 
+from config.prototype import PROTOTYPE
 from src.constants import (
     AIM_ORIGIN_OFFSET, BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE,
     GRID_ROWS, INITIAL_PLAYER_ROW, PLAYER_X, TILE_SIZE,
 )
-from src.states import ACTIVE_STATES, GameState
+from src.states import ACTIVE_STATES, GameOverReason, GameState
 from src.collision import Target
 from src.projectile import FixedStepPhysics, HitEvent, Projectile, ProjectileSnapshot
 from src.projectile import firing_velocities
 from src.combat import Combat
 from src.demo import create_demo_combat
+from src.encounter import Encounter, EncounterDefinition, EncounterOutcome
 from src.entities import (
     Crystal, CrystalSnapshot, Enemy, EnemySnapshot, EnemyTurnContext, validate_damage,
 )
@@ -65,11 +67,21 @@ class WorldSnapshot:
     crystals: tuple[CrystalSnapshot, ...]
     pending_bp: int
     last_resolved_turn: int | None
+    game_over_reason: GameOverReason | None
+    spawned_waves: int
+    total_waves: int
 
 
 class World:
-    def __init__(self, *, demo: bool = True) -> None:
+    def __init__(self, *, demo: bool | None = None,
+                 encounter: EncounterDefinition | None = None) -> None:
+        # Explicit demo modes retain the small regression fixtures used by earlier systems.
+        if demo is not None and (type(demo) is not bool or encounter is not None):
+            raise ValueError("Choose either a demo fixture or an encounter definition")
+        if encounter is not None and not isinstance(encounter, EncounterDefinition):
+            raise ValueError("Encounter configuration must be an EncounterDefinition")
         self._demo = demo
+        self._encounter_definition = (encounter or PROTOTYPE) if demo is None else None
         self.reset()
 
     @property
@@ -117,12 +129,21 @@ class World:
         self._physics = FixedStepPhysics()
         self._next_projectile_id = 1
         self.combat = create_demo_combat() if self._demo else Combat()
+        self.encounter = (Encounter(self._encounter_definition)
+                          if self._encounter_definition is not None else None)
         self._pending_turn: int | None = None
         self.last_resolved_turn: int | None = None
+        self.game_over_reason: GameOverReason | None = None
 
     def start_new_run(self) -> None:
         self.reset()
         self.transition_to(GameState.STAGE_INTRO)
+
+    def restart(self) -> bool:
+        if self.state not in (GameState.GAME_OVER, GameState.STAGE_CLEAR):
+            return False
+        self.start_new_run()
+        return True
 
     def transition_to(self, target: GameState) -> bool:
         """Reject invalid edges without changing scene, pause data, or resources.
@@ -143,8 +164,19 @@ class World:
         elif target not in _TRANSITIONS[self.state]:
             return False
 
+        previous_state = self.state
         self._state = target
+        if previous_state is GameState.STAGE_INTRO and target is GameState.PLAYER_AIM:
+            self.spawn_waves()
         return True
+
+    def spawn_waves(self) -> tuple[int, ...]:
+        """Spawn only between actions; scheduled entries retry at later boundaries."""
+        if (self.encounter is None
+                or self.state not in (GameState.PLAYER_AIM, GameState.TURN_RESOLVE)
+                or any(orb.active for orb in self.projectiles)):
+            return ()
+        return self.encounter.spawn_due(self.turn_index, self.combat)
 
     def pause(self) -> bool:
         return self.transition_to(GameState.PAUSED)
@@ -226,17 +258,21 @@ class World:
         previous_hp = max(0, self.hp)
         self.hp = max(0, previous_hp - amount)
         if self.hp == 0:
-            self._pending_turn = None
-            self.transition_to(GameState.GAME_OVER)
+            self._end_run(GameOverReason.HP_DEPLETED)
         return previous_hp - self.hp
 
-    def check_stage_end(self) -> bool:
-        """No encounter-clear rule exists yet, including for an empty demo.
+    def _end_run(self, reason: GameOverReason) -> None:
+        self._pending_turn = None
+        self.game_over_reason = reason
+        self.transition_to(GameState.GAME_OVER)
 
-        A future encounter controller may claim stage completion here. Until it
-        handles the scene change, a True result defers the enemy phase unchanged.
-        """
-        return False
+    def check_stage_end(self) -> bool:
+        """A prototype clears only after the final shot and all required defeats."""
+        return (self.state is GameState.TURN_RESOLVE
+                and not any(orb.active for orb in self.projectiles)
+                and not self.combat.pending_deaths and self.pending_bp == 0
+                and self.encounter is not None
+                and self.encounter.outcome(self.combat) is EncounterOutcome.CLEARED)
 
     def resolve_turn(self) -> bool:
         """Resolve one completed shot exactly once, without requiring a draw call."""
@@ -245,14 +281,14 @@ class World:
                 or any(orb.active for orb in self.projectiles)):
             return False
         if self.hp <= 0:
-            self._pending_turn = None
-            self.transition_to(GameState.GAME_OVER)
+            self._end_run(GameOverReason.HP_DEPLETED)
             return True
         self.bp = self.combat.finish_shot(self.bp)
-        if self.check_stage_end():
-            return False
         # Claim the action before invoking hooks, preventing repeated/reentrant phases.
         self._pending_turn = None
+        if self.check_stage_end():
+            self.transition_to(GameState.STAGE_CLEAR)
+            return True
         context = EnemyTurnContext(
             turn_index=self.turn_index,
             damage_player=self.apply_player_damage,
@@ -262,9 +298,13 @@ class World:
         self.last_resolved_turn = self.turn_index
         if self.hp <= 0 or self.state is GameState.GAME_OVER:
             if self.state is not GameState.GAME_OVER:
-                self.transition_to(GameState.GAME_OVER)
+                self._end_run(GameOverReason.HP_DEPLETED)
+        elif (self.encounter is not None
+              and self.encounter.outcome(self.combat) is EncounterOutcome.FAILED):
+            self._end_run(GameOverReason.DEFENSE_FAILED)
         else:
             self.turn_index += 1
+            self.spawn_waves()
             self.transition_to(GameState.PLAYER_AIM)
         return True
 
@@ -292,4 +332,7 @@ class World:
             ) if not crystal.collected),
             pending_bp=self.pending_bp,
             last_resolved_turn=self.last_resolved_turn,
+            game_over_reason=self.game_over_reason,
+            spawned_waves=len(self.encounter.spawned_waves) if self.encounter else 0,
+            total_waves=len(self.encounter.definition.waves) if self.encounter else 0,
         )

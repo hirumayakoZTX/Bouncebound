@@ -1,4 +1,4 @@
-"""Replaceable static combat demonstration; no waves or encounter progression."""
+"""Legacy static fixture retained for isolated combat regression tests."""
 
 from src.combat import Combat
 from src.entities import Crystal, Enemy, EnemyType

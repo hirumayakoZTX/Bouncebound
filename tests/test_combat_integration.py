@@ -223,7 +223,7 @@ class CombatIntegrationTests(unittest.TestCase):
         self.assertEqual(self.world.pending_bp, 0)
 
     def test_demo_shot_chains_bombs_collects_crystal_and_preserves_turn_boundary(self) -> None:
-        world = World()
+        world = World(demo=True)
         world.start_new_run()
         world.transition_to(GameState.PLAYER_AIM)
         world.set_aim_target((96, 240))
@@ -240,7 +240,7 @@ class CombatIntegrationTests(unittest.TestCase):
         self.assertIs(world.state, GameState.TURN_RESOLVE)
 
     def test_hit_limit_finishes_only_after_bomb_queue_and_pending_bp_are_resolved(self) -> None:
-        world = World()
+        world = World(demo=True)
         world.start_new_run()
         world.transition_to(GameState.PLAYER_AIM)
         world.set_aim_target((96, 240))
@@ -256,7 +256,7 @@ class CombatIntegrationTests(unittest.TestCase):
         self.assertEqual((world.bp, world.pending_bp, world.turn_index), (2, 0, 1))
 
     def test_reset_restores_fresh_demo_and_clears_all_pending_effects(self) -> None:
-        world = World()
+        world = World(demo=True)
         original = world.snapshot()
         world.combat.apply_damage(2, 5)
         world.crystals[4].collect()

@@ -332,18 +332,18 @@ class TurnTests(unittest.TestCase):
             check.assert_called_once_with()
         self.assertEqual(survivor.grid_col, 1)
 
-    def test_future_stage_end_claim_defers_enemy_phase_without_fake_progression(self) -> None:
+    def test_stage_end_claim_completes_action_before_enemy_phase(self) -> None:
         enemy = self.add_enemy()
         self.finish_shot()
         with patch.object(self.world, "check_stage_end", return_value=True):
-            self.assertFalse(self.world.resolve_turn())
+            self.assertTrue(self.world.resolve_turn())
         self.assertEqual((enemy.grid_col, self.world.turn_index), (4, 1))
-        self.assertIs(self.world.state, GameState.TURN_RESOLVE)
-        self.assertTrue(self.world.resolve_turn())
-        self.assertEqual(self.world.turn_index, 2)
+        self.assertIs(self.world.state, GameState.STAGE_CLEAR)
+        self.assertFalse(self.world.resolve_turn())
+        self.assertIsNone(self.world._pending_turn)
 
     def test_new_run_restores_hp_entities_action_history_and_pending_state(self) -> None:
-        world = World()
+        world = World(demo=True)
         world.start_new_run()
         world.transition_to(GameState.PLAYER_AIM)
         world.enemies[1].advance_one_cell()
@@ -351,7 +351,7 @@ class TurnTests(unittest.TestCase):
         world.enemies[2].escape(1)
         world.apply_player_damage(100)
         world.start_new_run()
-        expected = World()
+        expected = World(demo=True)
         expected.start_new_run()
         self.assertEqual(vars(world), vars(expected))
         self.assertEqual((world.hp, world.max_hp, world.mp, world.bp), (100, 100, 100, 1))

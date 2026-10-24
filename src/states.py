@@ -17,6 +17,11 @@ class GameState(Enum):
     PAUSED = auto()
 
 
+class GameOverReason(Enum):
+    HP_DEPLETED = "Player HP depleted"
+    DEFENSE_FAILED = "Defense failed: a required enemy escaped"
+
+
 ACTIVE_STATES = frozenset({
     GameState.PLAYER_AIM,
     GameState.SHOT_ANIMATION,
