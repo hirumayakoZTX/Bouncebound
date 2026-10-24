@@ -177,11 +177,11 @@ class SupportSpellTests(unittest.TestCase):
         self.assertEqual(len(self.world.statuses.snapshot()), 1)
         self.assertEqual(self.world.mp, 40)
 
-    def test_ward_does_not_intercept_or_consume_live_damage_yet(self):
+    def test_ward_intercepts_once_and_is_consumed_by_live_damage(self):
         self.world.execute_support_spell('barrier','ward')
-        self.world.apply_player_damage(5)
-        self.assertEqual(self.world.hp, 70)
-        self.assertEqual(self.world.statuses.get(StatusKind.WARD).charges, 1)
+        self.assertEqual(self.world.apply_player_damage(5), 0)
+        self.assertEqual(self.world.hp, 75)
+        self.assertIsNone(self.world.statuses.get(StatusKind.WARD))
         self.world.apply_player_damage(100)
         self.assertIs(self.world.state, GameState.GAME_OVER)
         self.assertEqual(self.world.hp, 0)
@@ -216,12 +216,15 @@ class SupportSpellTests(unittest.TestCase):
         self.reject('first','reraise',SpellFailure.ALREADY_COMMITTED)
         self.assertEqual(self.world.mp, 50)
 
-    def test_reraise_does_not_intercept_knockout_or_revive_yet(self):
+    def test_reraise_intercepts_one_knockout_and_is_consumed(self):
         self.world.execute_support_spell('revival','reraise')
         self.world.apply_player_damage(100)
+        self.assertIs(self.world.state, GameState.PLAYER_AIM)
+        self.assertEqual(self.world.hp, 50)
+        self.assertIsNone(self.world.statuses.get(StatusKind.RERAISE))
+        self.assertTrue(self.world.reraise_used)
+        self.world.apply_player_damage(100)
         self.assertIs(self.world.state, GameState.GAME_OVER)
-        self.assertEqual(self.world.hp, 0)
-        self.assertEqual(self.world.statuses.get(StatusKind.RERAISE).charges, 1)
 
     def test_each_spell_uses_exact_existing_cost_and_absolute_cooldown(self):
         expected = {'cure':(10,3), 'esuna':(20,5), 'levitation':(20,5),
@@ -353,6 +356,7 @@ class SupportSpellTests(unittest.TestCase):
                 world.execute_support_spell('revival','reraise')
                 if reset == 'restart':
                     world.apply_player_damage(100)
+                    world.apply_player_damage(100)  # The first knockout consumes Reraise.
                     self.assertTrue(world.restart())
                 else:
                     getattr(world,reset)()

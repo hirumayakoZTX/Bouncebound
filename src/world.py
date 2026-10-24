@@ -21,7 +21,9 @@ from src.entities import (
 from src.turns import resolve_enemy_phase
 from src.spells import SpellContext, SpellEngine, SpellId, SpellResult, StatusCheck
 from src.offensive_spells import OffensiveSpellResult, execute_offensive
-from src.statuses import StatusEffect, StatusState
+from src.statuses import StatusEffect, StatusEvent, StatusEventKind, StatusKind, StatusState
+from src.hazards import HazardState, PoisonTile
+from src.status_runtime import process_status_phase
 from src.support_spells import SupportSpellResult, execute_support
 
 
@@ -76,6 +78,8 @@ class WorldSnapshot:
     total_waves: int
     statuses: tuple[StatusEffect, ...] = ()
     reraise_used: bool = False
+    hazards: tuple[PoisonTile, ...] = ()
+    status_events: tuple[StatusEvent, ...] = ()
 
 
 class World:
@@ -128,6 +132,7 @@ class World:
         self.mp = self.max_mp = 100
         self.spells = SpellEngine()
         self.statuses = StatusState()
+        self.hazards = HazardState()
         self.reraise_used = False
         self.bp = 1
         self.player_row = INITIAL_PLAYER_ROW
@@ -198,7 +203,8 @@ class World:
     def move_player(self, delta_row: int) -> bool:
         """Move a single row during aiming without spending a turn or resources."""
         if (self.state is not GameState.PLAYER_AIM
-                or type(delta_row) is not int or delta_row not in (-1, 1)):
+                or type(delta_row) is not int or delta_row not in (-1, 1)
+                or self.statuses.is_active(StatusKind.BIND, self.turn_index)):
             return False
         next_row = self.player_row + delta_row
         if not 0 <= next_row < GRID_ROWS:
@@ -291,16 +297,76 @@ class World:
         """Model-only healing, cleansing, or grants; no status/turn processing."""
         return execute_support(action_id, spell_id, self, self.spells, status_check=status_check)
 
-    def apply_player_damage(self, amount: int) -> int:
-        """Apply a gameplay damage event and return actual HP lost after clamping."""
+    @property
+    def status_events(self) -> tuple[StatusEvent, ...]:
+        return self.statuses.events
+
+    def apply_status(self, kind: StatusKind, duration: int | None = None, *,
+                     source_id: int | str | None = None) -> StatusEvent:
+        """Direct model placement for fixtures and future abilities; no spell payment."""
+        defaults = {StatusKind.POISON: 3, StatusKind.BIND: 1, StatusKind.DOOM: 5,
+                    StatusKind.WARD: 1, StatusKind.LEVITATION: 1, StatusKind.RERAISE: None}
+        if not isinstance(kind, StatusKind):
+            raise ValueError("Status kind must be a StatusKind")
+        effect = StatusEffect(kind, defaults[kind] if duration is None else duration,
+                              self.turn_index, source_id,
+                              charges=1 if kind in (StatusKind.WARD, StatusKind.RERAISE) else None)
+        self.statuses.put(effect)
+        return self.status_events[-1]
+
+    def place_poison_tile(self, row: int, duration: int = 2, *,
+                          source_id: int | str | None = None) -> StatusEvent:
+        event = self.hazards.put(PoisonTile(row, duration, self.turn_index, source_id))
+        self.statuses.record(event)
+        return event
+
+    def remove_poison_tile(self, row: int) -> PoisonTile | None:
+        tile = self.hazards.remove(row)
+        if tile is not None:
+            self.statuses.record(StatusEvent(StatusEventKind.HAZARD_REMOVED, self.turn_index,
+                                              row=row, source_id=tile.source_id))
+        return tile
+
+    def apply_player_damage(self, amount: int, *, source: str = "direct",
+                            row: int | None = None) -> int:
+        """Return actual HP lost before any revival; Ward covers ordinary damage."""
         validate_damage(amount)
-        if self.state not in ACTIVE_STATES:
+        return self._resolve_player_damage(amount, source=source, row=row, forced=False)
+
+    def force_player_knockout(self, *, source: str = "doom") -> int:
+        """Forced knockout bypasses Ward, while still allowing one Reraise."""
+        return self._resolve_player_damage(0, source=source, row=None, forced=True)
+
+    def _resolve_player_damage(self, amount: int, *, source: str,
+                               row: int | None, forced: bool) -> int:
+        if self.state not in ACTIVE_STATES or self.hp <= 0 or (not forced and amount == 0):
             return 0
-        previous_hp = max(0, self.hp)
-        self.hp = max(0, previous_hp - amount)
+        before = self.hp
+        if not forced and self.statuses.is_active(StatusKind.WARD, self.turn_index):
+            self.statuses.record(StatusEvent(StatusEventKind.WARD_BLOCKED, self.turn_index,
+                                              StatusKind.WARD, row=row, source_id=source,
+                                              attempted_damage=amount, hp_before=before, hp_after=before))
+            self.statuses.remove(StatusKind.WARD, turn=self.turn_index)
+            return 0
+        self.hp = 0 if forced else max(0, before - amount)
+        lost = before - self.hp
+        kind = (StatusEventKind.FORCED_KNOCKOUT if forced else
+                StatusEventKind.POISON_DAMAGE if source == "poison" else
+                StatusEventKind.HAZARD_DAMAGE if source == "poison_tile" else StatusEventKind.DAMAGE)
+        self.statuses.record(StatusEvent(kind, self.turn_index, row=row, source_id=source,
+                                          amount=lost, attempted_damage=before if forced else amount,
+                                          hp_before=before, hp_after=self.hp))
         if self.hp == 0:
-            self._end_run(GameOverReason.HP_DEPLETED)
-        return previous_hp - self.hp
+            revival = self.statuses.get(StatusKind.RERAISE)
+            if revival is not None and self.statuses.is_active(StatusKind.RERAISE, self.turn_index):
+                self.statuses.remove(StatusKind.RERAISE, turn=self.turn_index)
+                self.hp = revival.revival_hp
+                self.statuses.record(StatusEvent(StatusEventKind.RERAISE_ACTIVATED, self.turn_index,
+                                                  StatusKind.RERAISE, source_id=revival.source_id,
+                                                  amount=self.hp, hp_before=0, hp_after=self.hp))
+            else:
+                self._end_run(GameOverReason.HP_DEPLETED)
+        return lost
 
     def _end_run(self, reason: GameOverReason) -> None:
         self._pending_turn = None
@@ -330,12 +396,14 @@ class World:
         if self.check_stage_end():
             self.transition_to(GameState.STAGE_CLEAR)
             return True
+        initial_statuses = self.statuses.snapshot()
         context = EnemyTurnContext(
             turn_index=self.turn_index,
-            damage_player=self.apply_player_damage,
+            damage_player=lambda amount: self.apply_player_damage(amount, source="enemy_contact"),
             player_defeated=lambda: self.hp <= 0 or self.state is GameState.GAME_OVER,
         )
         resolve_enemy_phase(self.enemies.values(), context)
+        process_status_phase(self, initial_statuses)
         self.last_resolved_turn = self.turn_index
         if self.hp <= 0 or self.state is GameState.GAME_OVER:
             if self.state is not GameState.GAME_OVER:
@@ -378,4 +446,6 @@ class World:
             total_waves=len(self.encounter.definition.waves) if self.encounter else 0,
             statuses=self.statuses.snapshot(),
             reraise_used=self.reraise_used,
+            hazards=self.hazards.snapshot(),
+            status_events=self.status_events,
         )

@@ -1,4 +1,4 @@
-"""Model-only support changes; duration and knockout processing remain deferred.
+"""Model-only support changes; status runtime is resolved through World turns.
 
 Distinct action IDs may still commit different spells in one turn. Player-facing
 casting and enforcement of one main action per turn belong to later integration.
@@ -89,9 +89,9 @@ def execute_support(action_id: str, spell_id: SpellId | str, owner: SupportOwner
     elif cast.spell_id is SpellId.ESUNA:
         removed = tuple(effect for effect in owner.statuses.snapshot() if effect.kind in ESUNA_REMOVABLE)
         for effect in removed:
-            owner.statuses.remove(effect.kind)
+            owner.statuses.remove(effect.kind, turn=cast.casting_turn)
     else:
-        # Grant state only: no immunity, damage interception, or revival runs here.
+        # Grant state; World handles protection and revival through unified damage resolution.
         kind = StatusKind(cast.spell_id.value)
         granted = StatusEffect(kind, None if kind is StatusKind.RERAISE else 1,
                                cast.casting_turn, source_id=action_id,

@@ -1,4 +1,4 @@
-"""Support state stays passive in the projectile-only playable prototype."""
+"""Model-applied support/status data integrates with the projectile-only controls."""
 
 from copy import deepcopy
 import os
@@ -68,12 +68,11 @@ class SupportIntegrationTests(unittest.TestCase):
         self.assertTrue(world.snapshot().reraise_used)
         self.assertEqual(len(world.snapshot().statuses),6)
 
-    def test_statuses_do_not_tick_or_bind_movement_during_normal_shooting_turns(self):
+    def test_statuses_process_on_shooting_turns_and_restart_clears_history(self):
         self.populate_model_statuses()
         world = self.game.world
-        initial_statuses = world.statuses.snapshot()
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_UP))
-        self.assertEqual(world.player_row,2)  # Bind runtime restrictions are intentionally deferred.
+        self.assertEqual(world.player_row,3)  # Bind applies through the next input interval.
         for row in (3,3,2,2,4,4,3):
             key = pygame.K_DOWN if row>world.player_row else pygame.K_UP
             for _ in range(abs(row-world.player_row)):
@@ -84,11 +83,10 @@ class SupportIntegrationTests(unittest.TestCase):
             for _ in range(20):
                 world.advance_time(.25)
             self.assertTrue(world.resolve_turn())
-            self.assertEqual(world.statuses.snapshot(),initial_statuses)
             self.assertTrue(world.reraise_used)
-            self.assertEqual(world.hp,100)
         self.assertIs(world.state,GameState.STAGE_CLEAR)
-        self.assertEqual((world.turn_index,world.hp,world.mp,world.bp),(7,100,0,5))
+        self.assertEqual((world.turn_index,world.hp,world.mp,world.bp),(7,50,0,5))
+        self.assertEqual(world.statuses.snapshot(),())
         self.assertEqual(len(world.combat.death_events),24)
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_r))
         self.assertIs(world.state,GameState.STAGE_INTRO)
@@ -114,16 +112,20 @@ class SupportIntegrationTests(unittest.TestCase):
         self.assertFalse(world.reraise_used)
         self.assertIsNone(world.statuses.get(StatusKind.RERAISE))
 
-    def test_combined_grants_do_not_intercept_damage_or_revive_and_restart_clears_them(self):
+    def test_combined_grants_intercept_once_and_restart_clears_them(self):
         self.populate_model_statuses()
         world = self.game.world
-        self.assertEqual(world.apply_player_damage(5),5)
-        self.assertEqual(world.hp,95)
+        self.assertEqual(world.apply_player_damage(5),0)
+        self.assertEqual(world.hp,100)
+        self.assertIsNone(world.statuses.get(StatusKind.WARD))
+        world.apply_player_damage(1000)
+        self.assertEqual(world.hp,50)
+        self.assertIs(world.state,GameState.PLAYER_AIM)
         world.apply_player_damage(1000)
         self.assertIs(world.state,GameState.GAME_OVER)
         self.assertEqual(world.hp,0)
-        self.assertEqual(world.statuses.get(StatusKind.WARD).charges,1)
-        self.assertEqual(world.statuses.get(StatusKind.RERAISE).charges,1)
+        self.assertIsNone(world.statuses.get(StatusKind.WARD))
+        self.assertIsNone(world.statuses.get(StatusKind.RERAISE))
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_r))
         self.assertIs(world.state,GameState.STAGE_INTRO)
         self.assertEqual(world.statuses.snapshot(),())
