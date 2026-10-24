@@ -1,11 +1,12 @@
 """Damage, FIFO Bomb death chains, and deferred BP collection."""
 
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from src.collision import Target
 from src.constants import BOMB_DAMAGE, MAX_BP
-from src.entities import Crystal, Enemy, EnemyType
+from src.entities import Crystal, Enemy, EnemyType, validate_damage, validate_id
 from src.projectile import HitEvent
 
 
@@ -14,6 +15,28 @@ class DeathEvent:
     enemy_id: int
     enemy_type: EnemyType
     source: str
+
+
+@dataclass(frozen=True)
+class EnemyDamage:
+    """Actual HP loss, including any explosion damage after the direct batch."""
+
+    enemy_id: int
+    hp_before: int
+    hp_after: int
+    direct_damage: int
+
+    @property
+    def explosion_damage(self) -> int:
+        return self.hp_before - self.hp_after - self.direct_damage
+
+
+@dataclass(frozen=True)
+class BatchDamageResult:
+    """Sorted HP changes and newly processed deaths in FIFO resolution order."""
+
+    changes: tuple[EnemyDamage, ...]
+    deaths: tuple[DeathEvent, ...]
 
 
 @dataclass
@@ -61,6 +84,35 @@ class Combat:
         killed = self._damage(enemy_id, amount, source)
         self.resolve_deaths()
         return killed
+
+    def apply_damage_batch(self, target_ids: Iterable[int], amount: int,
+                           source: str = "direct") -> BatchDamageResult:
+        """Land every direct hit before draining the shared FIFO death queue.
+
+        Validate the whole request first, deduplicate IDs, and preserve archives.
+        Returned changes include nonlethal explosion damage as well as direct hits.
+        """
+        validate_damage(amount)
+        ids = tuple(target_ids)
+        for enemy_id in ids:
+            validate_id(enemy_id)
+        ordered = sorted(set(ids))
+        before = {enemy_id: enemy.hp for enemy_id, enemy in self.enemies.items()}
+        death_index = len(self.death_events)
+        direct: dict[int, int] = {}
+        for enemy_id in ordered:
+            enemy = self.enemies.get(enemy_id)
+            if enemy is None or not enemy.active:
+                continue
+            hp = enemy.hp
+            self._damage(enemy_id, amount, source)
+            direct[enemy_id] = hp - enemy.hp
+        self.resolve_deaths()
+        changes = tuple(EnemyDamage(enemy_id, before[enemy_id], enemy.hp,
+                                    direct.get(enemy_id, 0))
+                        for enemy_id, enemy in sorted(self.enemies.items())
+                        if enemy.hp != before[enemy_id])
+        return BatchDamageResult(changes, tuple(self.death_events[death_index:]))
 
     def resolve_deaths(self) -> None:
         """Drain breadth-first in stable ID order; no recursive damage callbacks."""

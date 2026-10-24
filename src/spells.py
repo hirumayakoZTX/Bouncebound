@@ -73,6 +73,7 @@ class SpellFailure(Enum):
     STATUS_RESTRICTED = "A status-dependent casting restriction applies"
     INVALID_ACTION_ID = "Spell action ID must be a nonempty string"
     ALREADY_COMMITTED = "This spell action was already committed"
+    UNSUPPORTED_EFFECT = "Only Fire, Starstorm, and Meteor have offensive effects"
 
 
 @dataclass(frozen=True)
