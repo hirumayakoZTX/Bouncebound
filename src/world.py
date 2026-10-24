@@ -19,6 +19,7 @@ from src.entities import (
     Crystal, CrystalSnapshot, Enemy, EnemySnapshot, EnemyTurnContext, validate_damage,
 )
 from src.turns import resolve_enemy_phase
+from src.spells import SpellContext, SpellEngine, SpellId, SpellResult, StatusCheck
 
 
 # Action eligibility is checked by the controller before requesting scene edges.
@@ -120,6 +121,7 @@ class World:
         self.turn_index = 1
         self.hp = self.max_hp = 100
         self.mp = self.max_mp = 100
+        self.spells = SpellEngine()
         self.bp = 1
         self.player_row = INITIAL_PLAYER_ROW
         self.aim_target: tuple[float, float] | None = None
@@ -249,6 +251,26 @@ class World:
             self.bp = self.combat.finish_shot(self.bp)
             self.transition_to(GameState.TURN_RESOLVE)
         return events
+
+    def spell_context(self) -> SpellContext:
+        """Read-only adapter; no spell input or effect path is enabled yet."""
+        snapshot = self.snapshot()
+        return SpellContext(
+            state=snapshot.state, stage=snapshot.stage, turn_index=snapshot.turn_index,
+            hp=snapshot.hp, max_hp=snapshot.max_hp, mp=snapshot.mp,
+            player_row=snapshot.player_row, player_position=snapshot.player_position,
+            enemies=snapshot.enemies,
+            action_pending=bool(self.projectiles) or self._pending_turn is not None,
+        )
+
+    def validate_spell(self, spell_id: SpellId | str, *,
+                       status_check: StatusCheck | None = None) -> SpellResult:
+        return self.spells.validate(spell_id, self.spell_context(), status_check=status_check)
+
+    def commit_spell(self, action_id: str, spell_id: SpellId | str, *,
+                     status_check: StatusCheck | None = None) -> SpellResult:
+        """Model-only payment; future casting integration must resolve actual effects."""
+        return self.spells.commit(action_id, spell_id, self, status_check=status_check)
 
     def apply_player_damage(self, amount: int) -> int:
         """Apply a gameplay damage event and return actual HP lost after clamping."""
