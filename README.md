@@ -1,8 +1,8 @@
 # Bouncebound: Familiar Defense
 
 An original, offline, turn-driven ricochet defense game inspired by Kupo Kupo
-Adventure. The current version provides a placeholder title screen and clean
-exit. Gameplay is not implemented yet.
+Adventure. The current version provides a main menu, stage introduction,
+placeholder battlefield, and pause/resume. Combat is not implemented yet.
 
 ## Requirements
 
@@ -43,9 +43,20 @@ python main.py
 If PowerShell blocks activation, use `.\.venv\Scripts\python.exe` directly in
 place of `python` for installation, execution, and tests.
 
-A window titled **Bouncebound: Familiar Defense** displays the game title on a
-plain background. Press **Escape** or use the window close button to exit.
+A window titled **Bouncebound: Familiar Defense** opens at the main menu.
 Audio hardware is not initialized or required.
+
+## Controls and current functionality
+
+- **Enter** at the menu starts a fresh run and shows the stage introduction.
+- **Enter** at the introduction opens the placeholder battlefield.
+- **Escape** at the battlefield pauses; press it again to resume.
+- **Escape** at the menu exits. The window close button exits from any screen.
+
+New runs begin at Stage 1, Turn 1, with HP 100/100, MP 100/100, and BP 1.
+These resources are displayed only; no resource or combat mechanics are active.
+The battlefield waits for input without advancing turns. Pausing and resuming
+preserve the run. Other keys and mouse input currently have no gameplay effect.
 
 ## Verify
 
@@ -58,12 +69,15 @@ git diff --check
 
 The tests select SDL's dummy video driver and need no visible display. They cover
 imports, display initialization, resolution/title, event handling, the frame cap,
-shutdown, and startup without project assets. They do not verify a real desktop
-window or platform compatibility.
+shutdown, startup without project assets, scene transitions, reset, pause/resume,
+and rendering without changing run data. They do not verify a real desktop window
+or platform compatibility.
 
-Manual smoke test: run `python main.py`, confirm the title and placeholder are
-visible in a 960 × 576 window, press Escape, and confirm a clean exit. Relaunch
-and close using the window close button; confirm no traceback appears.
+Manual smoke test: run `python main.py`, confirm the 960 × 576 menu, then press
+Enter twice to reach the battlefield. Confirm Stage 1, Turn 1, HP/MP 100, and BP 1.
+Press Escape twice to pause/resume; values should remain unchanged. Enter, Space,
+movement keys, and mouse clicks must not advance combat. Close the window and
+confirm no traceback. Relaunch and press Escape at the menu to confirm clean exit.
 
 ## Repository layout
 
@@ -77,11 +91,16 @@ src/
   __init__.py           Application package
   constants.py          Display configuration
   game.py               Window, loop, events, and shutdown
-  renderer.py           Asset-free placeholder display
+  renderer.py           Asset-free scene display
+  states.py             Shared scene and turn-phase names
+  world.py              Run data, transitions, pause, and reset
 assets/                 Asset directory (.gitkeep only; no assets required)
 config/                 Configuration directory (.gitkeep only; currently unused)
 tests/
   test_bootstrap.py     Headless application checks
+  test_world.py         Deterministic controller and transition tests
+  test_scenes.py        Scene input and rendering checks
 ```
 
-No gameplay, scene transitions, combat, or persistence exists yet.
+No player movement, projectiles, enemies, combat, stage progression, or
+persistence exists yet.

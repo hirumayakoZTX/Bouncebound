@@ -40,11 +40,11 @@ class BootstrapTests(unittest.TestCase):
         original_draw = Renderer.draw
         observed_sizes = []
 
-        def draw_and_request_quit(renderer, screen):
+        def draw_and_request_quit(renderer, screen, snapshot):
             observed_sizes.append(screen.get_size())
             self.assertTrue(pygame.font.get_init())
             self.assertEqual(pygame.display.get_caption()[0], WINDOW_TITLE)
-            original_draw(renderer, screen)
+            original_draw(renderer, screen, snapshot)
             pygame.event.post(pygame.event.Event(pygame.QUIT))
 
         with patch("src.game.pygame.time.Clock", return_value=clock), patch.object(
@@ -99,8 +99,8 @@ class BootstrapTests(unittest.TestCase):
             "import pygame; from src.game import Game; "
             "from src.renderer import Renderer; "
             "original_draw = Renderer.draw; "
-            "Renderer.draw = lambda self, screen: "
-            "(original_draw(self, screen), "
+            "Renderer.draw = lambda self, screen, snapshot: "
+            "(original_draw(self, screen, snapshot), "
             "pygame.event.post(pygame.event.Event(pygame.QUIT))); "
             "Game().run(); assert not pygame.display.get_init()"
         )

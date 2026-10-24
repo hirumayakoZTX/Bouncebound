@@ -3,19 +3,59 @@
 import pygame
 
 from src.constants import WINDOW_TITLE
+from src.states import ACTIVE_STATES, GameState
+from src.world import WorldSnapshot
 
 
 class Renderer:
     def __init__(self) -> None:
-        title_font = pygame.font.Font(None, 48)
-        hint_font = pygame.font.Font(None, 26)
-        self.title = title_font.render(WINDOW_TITLE, True, (235, 239, 250))
-        self.hint = hint_font.render(
-            "Project bootstrap | Press Escape to exit", True, (164, 177, 203)
-        )
+        self.title_font = pygame.font.Font(None, 48)
+        self.body_font = pygame.font.Font(None, 28)
 
-    def draw(self, screen: pygame.Surface) -> None:
+    def draw(self, screen: pygame.Surface, snapshot: WorldSnapshot) -> None:
         screen.fill((21, 28, 44))
-        center_x, center_y = screen.get_rect().center
-        screen.blit(self.title, self.title.get_rect(center=(center_x, center_y - 24)))
-        screen.blit(self.hint, self.hint.get_rect(center=(center_x, center_y + 32)))
+        if snapshot.state is GameState.MENU:
+            self._center_text(screen, WINDOW_TITLE, 230, heading=True)
+            self._center_text(screen, "Enter: Start", 310)
+            self._center_text(screen, "Escape: Quit", 350)
+        elif snapshot.state is GameState.STAGE_INTRO:
+            self._center_text(screen, f"Stage {snapshot.stage}", 240, heading=True)
+            self._center_text(screen, "Enter: Continue", 320)
+        elif snapshot.state in ACTIVE_STATES or snapshot.state is GameState.PAUSED:
+            self._draw_battlefield(screen, snapshot)
+            if snapshot.state is GameState.PAUSED:
+                overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+                overlay.fill((0, 0, 0, 180))
+                screen.blit(overlay, (0, 0))
+                self._center_text(screen, "Paused", 250, heading=True)
+                self._center_text(screen, "Escape: Resume", 315)
+        else:
+            self._center_text(
+                screen, snapshot.state.name.replace("_", " ").title(),
+                screen.get_height() // 2, heading=True,
+            )
+
+    def _draw_battlefield(self, screen: pygame.Surface, snapshot: WorldSnapshot) -> None:
+        self._center_text(
+            screen, f"Stage {snapshot.stage}    Turn {snapshot.turn_index}", 32
+        )
+        arena = pygame.Rect(96, 72, 672, 384)
+        pygame.draw.rect(screen, (30, 43, 63), arena)
+        pygame.draw.rect(screen, (102, 139, 175), arena, width=2)
+        if snapshot.state is not GameState.PAUSED:
+            self._center_text(screen, "Waiting for input", 255)
+        self._center_text(
+            screen,
+            f"HP {snapshot.hp}/{snapshot.max_hp}    "
+            f"MP {snapshot.mp}/{snapshot.max_mp}    BP {snapshot.bp}",
+            500,
+        )
+        if snapshot.state is not GameState.PAUSED:
+            self._center_text(screen, f"{snapshot.state.name} | Escape: Pause", 540)
+
+    def _center_text(
+        self, screen: pygame.Surface, text: str, y: int, *, heading: bool = False
+    ) -> None:
+        font = self.title_font if heading else self.body_font
+        image = font.render(text, True, (235, 239, 250))
+        screen.blit(image, image.get_rect(center=(screen.get_width() // 2, y)))
