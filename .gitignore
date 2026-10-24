@@ -1,0 +1,33 @@
+# Python bytecode, test output, and packaging
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Virtual environments and local configuration
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+.python-version
+.idea/
+.vscode/
+*.log
+
+# Generated local records
+save/
+
+# Operating system metadata
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
