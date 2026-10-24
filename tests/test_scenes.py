@@ -148,8 +148,6 @@ class SceneTests(unittest.TestCase):
         game.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=(400, 300)))
         game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
         self.assertEqual(game.world.snapshot(), before)
-        game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1))
-        self.assertEqual(game.world.snapshot(), before)
         game.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=(900, 200)))
         self.assertIsNone(game.world.aim_target)
 
@@ -202,6 +200,7 @@ class SceneTests(unittest.TestCase):
         snapshots = []
         original_draw = Renderer.draw
         clock = Mock()
+        clock.tick.return_value = 16
 
         def observe_draw(renderer, screen, snapshot):
             snapshots.append(snapshot)

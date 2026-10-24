@@ -22,6 +22,12 @@ class Game:
         if event.type == pygame.MOUSEMOTION:
             self.world.set_aim_target(event.pos)
             return
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                if hasattr(event, "pos"):
+                    self.world.set_aim_target(event.pos)
+                self.world.fire()
+            return
         if event.type != pygame.KEYDOWN:
             return
 
@@ -54,17 +60,22 @@ class Game:
             clock = pygame.time.Clock()
             self.world.reset()
             self.running = True
+            elapsed = 0.0
 
             while self.running:
+                previous_state = self.world.state
                 for event in pygame.event.get():
                     self.handle_event(event)
                     if not self.running:
                         break
                 if not self.running:
                     break
+                # Do not charge a new shot or a resumed shot for the prior frame.
+                if previous_state is self.world.state is GameState.SHOT_ANIMATION:
+                    self.world.advance_time(elapsed)
                 renderer.draw(screen, self.world.snapshot())
                 pygame.display.flip()
-                clock.tick(TARGET_FPS)
+                elapsed = clock.tick(TARGET_FPS) / 1000.0
         finally:
             self.running = False
             pygame.quit()

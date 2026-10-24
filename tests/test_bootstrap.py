@@ -37,6 +37,7 @@ class BootstrapTests(unittest.TestCase):
     def test_window_renders_and_processes_posted_quit_with_frame_cap(self) -> None:
         game = Game()
         clock = Mock()
+        clock.tick.return_value = 16
         original_draw = Renderer.draw
         observed_sizes = []
 

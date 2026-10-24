@@ -8,9 +8,11 @@ from src.constants import (
     GRID_ROWS, INITIAL_PLAYER_ROW, PLAYER_X, TILE_SIZE,
 )
 from src.states import ACTIVE_STATES, GameState
+from src.collision import Target
+from src.projectile import FixedStepPhysics, HitEvent, Projectile, ProjectileSnapshot
 
 
-# Future phases have transition contracts but no input or gameplay triggers yet.
+# Combat and stage conditions remain the responsibility of future systems.
 _ACTION_END_STATES = frozenset({
     GameState.TURN_RESOLVE,
     GameState.STAGE_CLEAR,
@@ -50,6 +52,8 @@ class WorldSnapshot:
     player_position: tuple[int, int]
     aim_origin: tuple[int, int]
     aim_target: tuple[float, float] | None
+    paused_state: GameState | None
+    projectiles: tuple[ProjectileSnapshot, ...]
 
 
 class World:
@@ -85,6 +89,9 @@ class World:
         self.aim_target: tuple[float, float] | None = None
         self._state = GameState.MENU
         self._paused_state: GameState | None = None
+        self.projectiles: list[Projectile] = []
+        self._physics = FixedStepPhysics()
+        self._next_projectile_id = 1
 
     def start_new_run(self) -> None:
         self.reset()
@@ -152,6 +159,32 @@ class World:
         self.aim_target = None
         return False
 
+    def fire(self) -> bool:
+        """Lock one orb's direction; BP is not ammunition and remains unchanged."""
+        if (self.state is not GameState.PLAYER_AIM or self.aim_target is None
+                or self.projectiles):
+            return False
+        if not self.set_aim_target(self.aim_target):
+            return False
+        self.projectiles.append(Projectile.launch(
+            self._next_projectile_id, self.aim_origin, self.aim_target
+        ))
+        self._next_projectile_id += 1
+        self._physics.accumulator = 0.0
+        return self.transition_to(GameState.SHOT_ANIMATION)
+
+    def advance_time(
+        self, dt: float, targets: tuple[Target, ...] = ()
+    ) -> tuple[HitEvent, ...]:
+        """Simulate active shots only; paused elapsed time is never accumulated."""
+        if self.state is not GameState.SHOT_ANIMATION:
+            return ()
+        events = self._physics.advance(dt, self.projectiles, targets)
+        self.projectiles = [orb for orb in self.projectiles if orb.active]
+        if not self.projectiles:
+            self.transition_to(GameState.TURN_RESOLVE)
+        return events
+
     def snapshot(self) -> WorldSnapshot:
         return WorldSnapshot(
             state=self.state,
@@ -166,4 +199,6 @@ class World:
             player_position=self.player_position,
             aim_origin=self.aim_origin,
             aim_target=self.aim_target,
+            paused_state=self.paused_state,
+            projectiles=tuple(orb.snapshot() for orb in self.projectiles if orb.active),
         )

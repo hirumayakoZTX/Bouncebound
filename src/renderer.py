@@ -43,7 +43,9 @@ class Renderer:
         pygame.draw.rect(screen, (30, 43, 63), arena)
         pygame.draw.rect(screen, (102, 139, 175), arena, width=2)
         if (snapshot.aim_target is not None
-                and snapshot.state in (GameState.PLAYER_AIM, GameState.PAUSED)):
+                and (snapshot.state is GameState.PLAYER_AIM
+                     or (snapshot.state is GameState.PAUSED
+                         and snapshot.paused_state is GameState.PLAYER_AIM))):
             pygame.draw.line(
                 screen, (249, 211, 113), snapshot.aim_origin, snapshot.aim_target, width=1
             )
@@ -53,8 +55,14 @@ class Renderer:
         pygame.draw.polygon(
             screen, (235, 239, 250), ((x - 24, y), (x - 8, y - 10), (x - 8, y + 10))
         )
-        if snapshot.state is not GameState.PAUSED:
+        for projectile in snapshot.projectiles:
+            pygame.draw.circle(screen, (255, 225, 133), projectile.position, projectile.radius)
+        if snapshot.state is GameState.PLAYER_AIM:
             self._center_text(screen, "Waiting for input", 472)
+        elif snapshot.state is GameState.SHOT_ANIMATION:
+            self._center_text(screen, "Orb in flight", 472)
+        elif snapshot.state is GameState.TURN_RESOLVE:
+            self._center_text(screen, "Turn resolution pending (prototype stops here)", 472)
         self._center_text(
             screen,
             f"HP {snapshot.hp}/{snapshot.max_hp}    "
