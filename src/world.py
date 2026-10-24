@@ -1,7 +1,12 @@
 """Run data and validated scene transitions without rendering dependencies."""
 
 from dataclasses import dataclass
+from math import isfinite
 
+from src.constants import (
+    AIM_ORIGIN_OFFSET, BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE,
+    GRID_ROWS, INITIAL_PLAYER_ROW, PLAYER_X, TILE_SIZE,
+)
 from src.states import ACTIVE_STATES, GameState
 
 
@@ -41,6 +46,10 @@ class WorldSnapshot:
     mp: int
     max_mp: int
     bp: int
+    player_row: int
+    player_position: tuple[int, int]
+    aim_origin: tuple[int, int]
+    aim_target: tuple[float, float] | None
 
 
 class World:
@@ -55,6 +64,16 @@ class World:
     def paused_state(self) -> GameState | None:
         return self._paused_state
 
+    @property
+    def player_position(self) -> tuple[int, int]:
+        return (PLAYER_X, BATTLEFIELD_ORIGIN[1] + TILE_SIZE // 2
+                + TILE_SIZE * self.player_row)
+
+    @property
+    def aim_origin(self) -> tuple[int, int]:
+        x, y = self.player_position
+        return (x - AIM_ORIGIN_OFFSET, y)
+
     def reset(self) -> None:
         """Restore the menu and all data currently owned by the run."""
         self.stage = 1
@@ -62,6 +81,8 @@ class World:
         self.hp = self.max_hp = 100
         self.mp = self.max_mp = 100
         self.bp = 1
+        self.player_row = INITIAL_PLAYER_ROW
+        self.aim_target: tuple[float, float] | None = None
         self._state = GameState.MENU
         self._paused_state: GameState | None = None
 
@@ -99,6 +120,38 @@ class World:
             return False
         return self.transition_to(self.paused_state)
 
+    def move_player(self, delta_row: int) -> bool:
+        """Move a single row during aiming without spending a turn or resources."""
+        if (self.state is not GameState.PLAYER_AIM
+                or type(delta_row) is not int or delta_row not in (-1, 1)):
+            return False
+        next_row = self.player_row + delta_row
+        if not 0 <= next_row < GRID_ROWS:
+            return False
+        self.player_row = next_row
+        return True
+
+    def set_aim_target(self, target: tuple[float, float]) -> bool:
+        """Accept a finite battlefield point; invalid active input clears aiming."""
+        if self.state is not GameState.PLAYER_AIM:
+            return False
+        if (not isinstance(target, tuple) or len(target) != 2
+                or any(type(value) not in (int, float) or not isfinite(value)
+                       for value in target)):
+            self.aim_target = None
+            return False
+
+        x, y = target
+        left, top = BATTLEFIELD_ORIGIN
+        width, height = BATTLEFIELD_SIZE
+        # The design's field bounds include the right and bottom edges.
+        if (left <= x <= left + width and top <= y <= top + height
+                and x < self.aim_origin[0]):
+            self.aim_target = (float(x), float(y))
+            return True
+        self.aim_target = None
+        return False
+
     def snapshot(self) -> WorldSnapshot:
         return WorldSnapshot(
             state=self.state,
@@ -109,4 +162,8 @@ class World:
             mp=self.mp,
             max_mp=self.max_mp,
             bp=self.bp,
+            player_row=self.player_row,
+            player_position=self.player_position,
+            aim_origin=self.aim_origin,
+            aim_target=self.aim_target,
         )

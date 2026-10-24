@@ -17,7 +17,12 @@ class Game:
         if event.type == pygame.QUIT:
             self.running = False
             return
-        if not self.running or event.type != pygame.KEYDOWN:
+        if not self.running:
+            return
+        if event.type == pygame.MOUSEMOTION:
+            self.world.set_aim_target(event.pos)
+            return
+        if event.type != pygame.KEYDOWN:
             return
 
         if event.key == pygame.K_RETURN:
@@ -32,6 +37,11 @@ class Game:
                 self.world.resume()
             elif self.world.state in ACTIVE_STATES:
                 self.world.pause()
+        elif not getattr(event, "repeat", False):
+            if event.key in (pygame.K_w, pygame.K_UP):
+                self.world.move_player(-1)
+            elif event.key in (pygame.K_s, pygame.K_DOWN):
+                self.world.move_player(1)
 
     def run(self) -> None:
         try:

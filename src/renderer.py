@@ -2,7 +2,7 @@
 
 import pygame
 
-from src.constants import WINDOW_TITLE
+from src.constants import BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE, WINDOW_TITLE
 from src.states import ACTIVE_STATES, GameState
 from src.world import WorldSnapshot
 
@@ -39,11 +39,22 @@ class Renderer:
         self._center_text(
             screen, f"Stage {snapshot.stage}    Turn {snapshot.turn_index}", 32
         )
-        arena = pygame.Rect(96, 72, 672, 384)
+        arena = pygame.Rect(BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE)
         pygame.draw.rect(screen, (30, 43, 63), arena)
         pygame.draw.rect(screen, (102, 139, 175), arena, width=2)
+        if (snapshot.aim_target is not None
+                and snapshot.state in (GameState.PLAYER_AIM, GameState.PAUSED)):
+            pygame.draw.line(
+                screen, (249, 211, 113), snapshot.aim_origin, snapshot.aim_target, width=1
+            )
+            pygame.draw.circle(screen, (249, 211, 113), snapshot.aim_target, 4, width=1)
+        x, y = snapshot.player_position
+        pygame.draw.circle(screen, (129, 209, 236), (x, y), 18)
+        pygame.draw.polygon(
+            screen, (235, 239, 250), ((x - 24, y), (x - 8, y - 10), (x - 8, y + 10))
+        )
         if snapshot.state is not GameState.PAUSED:
-            self._center_text(screen, "Waiting for input", 255)
+            self._center_text(screen, "Waiting for input", 472)
         self._center_text(
             screen,
             f"HP {snapshot.hp}/{snapshot.max_hp}    "

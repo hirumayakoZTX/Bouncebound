@@ -106,12 +106,52 @@ class SceneTests(unittest.TestCase):
             with self.subTest(state=state):
                 game = self.game_in_state(state)
                 before = deepcopy(vars(game.world))
-                for key in (pygame.K_w, pygame.K_s, pygame.K_UP, pygame.K_DOWN,
-                            pygame.K_SPACE, pygame.K_1, pygame.K_r):
+                for key in (pygame.K_SPACE, pygame.K_1, pygame.K_r):
                     game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
                 game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1))
+                self.assertEqual(vars(game.world), before)
+
+    def test_movement_keys_move_exactly_one_row_and_ignore_key_repeat(self) -> None:
+        for key, expected_row in ((pygame.K_w, 2), (pygame.K_UP, 2),
+                                  (pygame.K_s, 4), (pygame.K_DOWN, 4)):
+            with self.subTest(key=key):
+                game = self.game_in_state(GameState.PLAYER_AIM)
+                game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
+                self.assertEqual(game.world.player_row, expected_row)
+                game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key, repeat=True))
+                self.assertEqual(game.world.player_row, expected_row)
+                self.assertIs(game.world.state, GameState.PLAYER_AIM)
+                self.assertEqual((game.world.turn_index, game.world.hp,
+                                  game.world.mp, game.world.bp), (1, 100, 100, 1))
+
+    def test_movement_and_mouse_input_are_ignored_outside_aiming(self) -> None:
+        for state in GameState:
+            if state is GameState.PLAYER_AIM:
+                continue
+            with self.subTest(state=state):
+                game = self.game_in_state(state)
+                before = deepcopy(vars(game.world))
+                for key in (pygame.K_w, pygame.K_s, pygame.K_UP, pygame.K_DOWN):
+                    game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
                 game.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=(100, 100)))
                 self.assertEqual(vars(game.world), before)
+
+    def test_mouse_aim_moves_with_player_and_survives_pause(self) -> None:
+        game = self.game_in_state(GameState.PLAYER_AIM)
+        game.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=(200, 150)))
+        self.assertEqual(game.world.aim_target, (200, 150))
+        game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_w))
+        self.assertEqual(game.world.snapshot().aim_origin, (808, 192))
+        before = game.world.snapshot()
+        game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_s))
+        game.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=(400, 300)))
+        game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        self.assertEqual(game.world.snapshot(), before)
+        game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1))
+        self.assertEqual(game.world.snapshot(), before)
+        game.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=(900, 200)))
+        self.assertIsNone(game.world.aim_target)
 
     def test_rendering_all_scenes_preserves_world_and_snapshot(self) -> None:
         pygame.display.init()
@@ -121,12 +161,37 @@ class SceneTests(unittest.TestCase):
         for state in GameState:
             with self.subTest(state=state):
                 world = world_in_state(state)
+                if state is GameState.PLAYER_AIM:
+                    world.move_player(-1)
+                    world.set_aim_target((200, 150))
                 before = deepcopy(vars(world))
                 snapshot = world.snapshot()
                 for _ in range(3):
                     renderer.draw(screen, snapshot)
                 self.assertEqual(world.snapshot(), snapshot)
                 self.assertEqual(vars(world), before)
+
+    def test_renderer_uses_snapshot_player_position_and_valid_aim_only(self) -> None:
+        pygame.display.init()
+        pygame.font.init()
+        screen = pygame.display.set_mode(LOGICAL_SIZE)
+        renderer = Renderer()
+        world = world_in_state(GameState.PLAYER_AIM)
+        world.move_player(-1)
+        world.set_aim_target((200, 150))
+        before = deepcopy(vars(world))
+        with patch("src.renderer.pygame.draw.line", wraps=pygame.draw.line) as line, patch(
+            "src.renderer.pygame.draw.circle", wraps=pygame.draw.circle
+        ) as circle:
+            renderer.draw(screen, world.snapshot())
+            self.assertEqual(line.call_count, 1)
+            self.assertEqual(line.call_args.args[2:4], ((808, 192), (200, 150)))
+            self.assertTrue(any(args.args[2] == (824, 192) for args in circle.call_args_list))
+        self.assertEqual(vars(world), before)
+        world.set_aim_target((900, 200))
+        with patch("src.renderer.pygame.draw.line", wraps=pygame.draw.line) as line:
+            renderer.draw(screen, world.snapshot())
+            line.assert_not_called()
 
     def test_event_loop_navigation_keeps_turn_and_frame_cap(self) -> None:
         game = Game()
