@@ -33,8 +33,11 @@ class Bounds:
 
 @dataclass(frozen=True)
 class Target:
+    """A reflecting damage target or a non-reflecting, zero-damage trigger."""
+
     target_id: int
     bounds: Bounds
+    reflects: bool = True
 
 
 @dataclass(frozen=True)

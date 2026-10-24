@@ -23,7 +23,7 @@ from src.world import World
 
 class ShootingTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.world = World()
+        self.world = World(demo=False)
         self.world.start_new_run()
         self.world.transition_to(GameState.PLAYER_AIM)
 
@@ -119,7 +119,7 @@ class ShootingTests(unittest.TestCase):
         self.world.advance_time(0.004)
         self.world.pause()
         self.world.start_new_run()
-        self.assertEqual(vars(self.world), vars(World()) | {"_state": GameState.STAGE_INTRO})
+        self.assertEqual(vars(self.world), vars(World(demo=False)) | {"_state": GameState.STAGE_INTRO})
         self.world.transition_to(GameState.PLAYER_AIM)
         self.fire()
         self.assertEqual(self.world.projectiles[0].projectile_id, 1)

@@ -1,14 +1,15 @@
 """Bounded fixed-step orb simulation and immutable physics events."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from math import hypot, isfinite
+from math import atan2, cos, hypot, isfinite, pi, radians, sin
 
 from src.collision import (
     Bounds, Contact, EPSILON, Point, Target, circle_overlaps, is_approaching, sweep_circle,
 )
 from src.constants import (
     BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE, MAX_PHYSICS_STEPS, MAX_STEP_CONTACTS,
-    ORB_DAMAGE, ORB_MAX_HITS, ORB_MAX_LIFETIME, ORB_RADIUS, ORB_SPEED, PHYSICS_STEP,
+    MAX_BP, ORB_DAMAGE, ORB_MAX_HITS, ORB_MAX_LIFETIME, ORB_RADIUS, ORB_SPEED, PHYSICS_STEP,
 )
 
 
@@ -24,6 +25,33 @@ class HitEvent:
     damage: int
     position: Point
     normal: Point
+
+
+TargetProvider = Callable[[], tuple[Target, ...]]
+HitHandler = Callable[[HitEvent], None]
+
+
+def _ordered_targets(targets: tuple[Target, ...]) -> tuple[Target, ...]:
+    if len({target.target_id for target in targets}) != len(targets):
+        raise ValueError("Collision targets must have unique stable IDs")
+    return tuple(sorted(targets, key=lambda target: target.target_id))
+
+
+def firing_velocities(origin: Point, target: Point, bp: int) -> tuple[Point, ...]:
+    """Center a symmetric fan; compress steep fans to keep all rays leftward."""
+    if type(bp) is not int or not 1 <= bp <= MAX_BP:
+        raise ValueError("BP must be an integer from 1 to 5")
+    dx, dy = target[0] - origin[0], target[1] - origin[1]
+    if dx >= 0 or not isfinite(hypot(dx, dy)):
+        raise ValueError("A shot requires a finite target left of its origin")
+    heading = atan2(dy, -dx)
+    spread = radians(2.5 * (bp - 1))
+    # Reserve half the angular room to vertical so outer rays can enter naturally.
+    available = (pi / 2 - abs(heading)) / 2
+    scale = min(1.0, available / spread) if spread else 1.0
+    offsets = [radians(5 * (index - (bp - 1) / 2)) * scale for index in range(bp)]
+    return tuple((-ORB_SPEED * cos(heading + offset), ORB_SPEED * sin(heading + offset))
+                 for offset in offsets)
 
 
 @dataclass(frozen=True)
@@ -108,13 +136,17 @@ class Projectile:
         if dot < 0:
             self.velocity = (vx - 2 * dot * nx, vy - 2 * dot * ny)
 
-    def step(self, dt: float, targets: tuple[Target, ...] = ()) -> tuple[HitEvent, ...]:
+    def step(
+        self, dt: float, targets: tuple[Target, ...] = (), *,
+        target_provider: TargetProvider | None = None, on_hit: HitHandler | None = None,
+    ) -> tuple[HitEvent, ...]:
         """Advance a step using swept impacts; inactive orbs are never touched.
 
         Top/bottom planes extend across the entry gap. The right wall is enabled
         only once the entire circle enters. Simultaneous wall normals both apply;
         equal-time target ties use stable IDs. A contact-iteration safety cap
         consumes leftover step time without motion in pathological target layouts.
+        Optional generic hooks resolve a contact before later targets are checked.
         """
         if not self.active:
             return ()
@@ -129,12 +161,14 @@ class Projectile:
         duration = min(dt, max(0.0, self.max_lifetime - self.age))
         remaining = duration
         events = []
-        ordered = tuple(sorted(targets, key=lambda target: target.target_id))
+        ordered = _ordered_targets(targets)
         for _ in range(MAX_STEP_CONTACTS):
             if remaining <= EPSILON or not self.active:
                 break
             if inner.contains(self.position):
                 self.entered_arena = True
+            if target_provider is not None:
+                ordered = _ordered_targets(target_provider())
             self._clear_separated_contacts(ordered)
             walls = self._wall_contacts(remaining, inner)
             impacts = []
@@ -143,7 +177,7 @@ class Projectile:
                     contact = sweep_circle(self.position, self.velocity, self.radius,
                                            target.bounds, remaining)
                     if contact is not None:
-                        impacts.append((contact, target.target_id))
+                        impacts.append((contact, target))
             candidates = [contact.time for contact in walls]
             candidates.extend(contact.time for contact, _ in impacts)
             # Crossing this plane is an entry event, not a reflection.
@@ -167,19 +201,28 @@ class Projectile:
             for contact in walls:
                 if abs(contact.time - elapsed) <= EPSILON:
                     self._reflect(contact.normal)
-            for contact, target_id in impacts:
+            for contact, target in impacts:
                 if abs(contact.time - elapsed) > EPSILON:
                     continue
+                if target_provider is not None:
+                    available = {item.target_id for item in target_provider()}
+                    if target.target_id not in available:
+                        continue
                 self.position = contact.position
-                if is_approaching(self.velocity, contact.normal):
+                if target.reflects and is_approaching(self.velocity, contact.normal):
                     self._reflect(contact.normal)
-                self.contact_ids.add(target_id)
+                self.contact_ids.add(target.target_id)
                 # Pre-existing penetration is corrected and tracked, never scored as a hit.
                 if not contact.is_impact:
                     continue
-                self.hits += 1
-                events.append(HitEvent(self.projectile_id, target_id, self.damage,
-                                       self.position, contact.normal))
+                if target.reflects:
+                    self.hits += 1
+                event = HitEvent(self.projectile_id, target.target_id,
+                                 self.damage if target.reflects else 0,
+                                 self.position, contact.normal)
+                events.append(event)
+                if on_hit is not None:
+                    on_hit(event)
                 if self.hits >= self.max_hits:
                     self.active = False
                     break
@@ -191,6 +234,8 @@ class Projectile:
             self.entered_arena = True
         if self.entered_arena and not inner.contains(self.position):
             self.active = False
+        if target_provider is not None:
+            ordered = _ordered_targets(target_provider())
         self._clear_separated_contacts(ordered)
         return tuple(events)
 
@@ -200,22 +245,27 @@ class FixedStepPhysics:
     accumulator: float = 0.0
 
     def advance(
-        self, dt: float, projectiles: list[Projectile], targets: tuple[Target, ...] = ()
+        self, dt: float, projectiles: list[Projectile], targets: tuple[Target, ...] = (), *,
+        target_provider: TargetProvider | None = None, on_hit: HitHandler | None = None,
     ) -> tuple[HitEvent, ...]:
-        """Accept at most 0.25 seconds per frame; drop excess time, never backlog it."""
+        """Accept at most 0.25 seconds per frame; drop excess time, never backlog it.
+
+        Projectiles use stable ID order within each step. Inline hit callbacks and
+        fresh target queries prevent removed targets responding to later contacts.
+        """
         if not isfinite(dt) or dt < 0:
             raise ValueError("Frame time must be finite and nonnegative")
         if not any(projectile.active for projectile in projectiles):
             self.accumulator = 0.0
             return ()
-        if len({target.target_id for target in targets}) != len(targets):
-            raise ValueError("Collision targets must have unique stable IDs")
+        targets = _ordered_targets(targets)
         self.accumulator += min(dt, PHYSICS_STEP * MAX_PHYSICS_STEPS)
         steps = min(MAX_PHYSICS_STEPS, int((self.accumulator + EPSILON) / PHYSICS_STEP))
         events = []
         for _ in range(steps):
-            for projectile in projectiles:
-                events.extend(projectile.step(PHYSICS_STEP, targets))
+            for projectile in sorted(projectiles, key=lambda orb: orb.projectile_id):
+                events.extend(projectile.step(PHYSICS_STEP, targets,
+                                               target_provider=target_provider, on_hit=on_hit))
             self.accumulator = max(0.0, self.accumulator - PHYSICS_STEP)
             if not any(projectile.active for projectile in projectiles):
                 self.accumulator = 0.0

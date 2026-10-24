@@ -10,6 +10,10 @@ from src.constants import (
 from src.states import ACTIVE_STATES, GameState
 from src.collision import Target
 from src.projectile import FixedStepPhysics, HitEvent, Projectile, ProjectileSnapshot
+from src.projectile import firing_velocities
+from src.combat import Combat
+from src.demo import create_demo_combat
+from src.entities import Crystal, CrystalSnapshot, Enemy, EnemySnapshot
 
 
 # Combat and stage conditions remain the responsibility of future systems.
@@ -54,10 +58,14 @@ class WorldSnapshot:
     aim_target: tuple[float, float] | None
     paused_state: GameState | None
     projectiles: tuple[ProjectileSnapshot, ...]
+    enemies: tuple[EnemySnapshot, ...]
+    crystals: tuple[CrystalSnapshot, ...]
+    pending_bp: int
 
 
 class World:
-    def __init__(self) -> None:
+    def __init__(self, *, demo: bool = True) -> None:
+        self._demo = demo
         self.reset()
 
     @property
@@ -67,6 +75,18 @@ class World:
     @property
     def paused_state(self) -> GameState | None:
         return self._paused_state
+
+    @property
+    def enemies(self) -> dict[int, Enemy]:
+        return self.combat.enemies
+
+    @property
+    def crystals(self) -> dict[int, Crystal]:
+        return self.combat.crystals
+
+    @property
+    def pending_bp(self) -> int:
+        return self.combat.pending_bp
 
     @property
     def player_position(self) -> tuple[int, int]:
@@ -92,6 +112,7 @@ class World:
         self.projectiles: list[Projectile] = []
         self._physics = FixedStepPhysics()
         self._next_projectile_id = 1
+        self.combat = create_demo_combat() if self._demo else Combat()
 
     def start_new_run(self) -> None:
         self.reset()
@@ -160,28 +181,33 @@ class World:
         return False
 
     def fire(self) -> bool:
-        """Lock one orb's direction; BP is not ammunition and remains unchanged."""
+        """Capture current BP and launch its complete, independent orb fan."""
         if (self.state is not GameState.PLAYER_AIM or self.aim_target is None
                 or self.projectiles):
             return False
         if not self.set_aim_target(self.aim_target):
             return False
-        self.projectiles.append(Projectile.launch(
-            self._next_projectile_id, self.aim_origin, self.aim_target
-        ))
-        self._next_projectile_id += 1
+        velocities = firing_velocities(self.aim_origin, self.aim_target, self.bp)
+        self.projectiles = [Projectile(self._next_projectile_id + index, self.aim_origin, velocity)
+                            for index, velocity in enumerate(velocities)]
+        self._next_projectile_id += len(velocities)
         self._physics.accumulator = 0.0
         return self.transition_to(GameState.SHOT_ANIMATION)
 
     def advance_time(
         self, dt: float, targets: tuple[Target, ...] = ()
     ) -> tuple[HitEvent, ...]:
-        """Simulate active shots only; paused elapsed time is never accumulated."""
+        """Resolve each impact synchronously; returned events are already applied."""
         if self.state is not GameState.SHOT_ANIMATION:
             return ()
-        events = self._physics.advance(dt, self.projectiles, targets)
+        events = self._physics.advance(
+            dt, self.projectiles,
+            target_provider=lambda: self.combat.targets() + targets,
+            on_hit=self.combat.handle_hit,
+        )
         self.projectiles = [orb for orb in self.projectiles if orb.active]
         if not self.projectiles:
+            self.bp = self.combat.finish_shot(self.bp)
             self.transition_to(GameState.TURN_RESOLVE)
         return events
 
@@ -201,4 +227,11 @@ class World:
             aim_target=self.aim_target,
             paused_state=self.paused_state,
             projectiles=tuple(orb.snapshot() for orb in self.projectiles if orb.active),
+            enemies=tuple(enemy.snapshot() for enemy in sorted(
+                self.enemies.values(), key=lambda enemy: enemy.enemy_id
+            ) if enemy.alive),
+            crystals=tuple(crystal.snapshot() for crystal in sorted(
+                self.crystals.values(), key=lambda crystal: crystal.crystal_id
+            ) if not crystal.collected),
+            pending_bp=self.pending_bp,
         )

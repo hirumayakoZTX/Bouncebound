@@ -5,6 +5,7 @@ import pygame
 from src.constants import BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE, WINDOW_TITLE
 from src.states import ACTIVE_STATES, GameState
 from src.world import WorldSnapshot
+from src.entities import EnemyType
 
 
 class Renderer:
@@ -42,6 +43,22 @@ class Renderer:
         arena = pygame.Rect(BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE)
         pygame.draw.rect(screen, (30, 43, 63), arena)
         pygame.draw.rect(screen, (102, 139, 175), arena, width=2)
+        self._center_text(screen, "Green: Slime | Red: Bomb | Blue: BP Crystal", 56)
+        for enemy in snapshot.enemies:
+            rect = pygame.Rect(enemy.bounds.left, enemy.bounds.top,
+                               enemy.bounds.right - enemy.bounds.left,
+                               enemy.bounds.bottom - enemy.bounds.top)
+            color = (81, 158, 105) if enemy.enemy_type is EnemyType.BASIC else (190, 75, 79)
+            pygame.draw.rect(screen, color, rect, border_radius=6)
+            prefix = "S" if enemy.enemy_type is EnemyType.BASIC else "B"
+            label = self.body_font.render(f"{prefix}{enemy.hp}", True, (255, 255, 255))
+            screen.blit(label, label.get_rect(center=rect.center))
+        for crystal in snapshot.crystals:
+            cx = (crystal.bounds.left + crystal.bounds.right) / 2
+            cy = (crystal.bounds.top + crystal.bounds.bottom) / 2
+            pygame.draw.polygon(screen, (74, 172, 255),
+                                ((cx, cy - 17), (cx + 14, cy),
+                                 (cx, cy + 17), (cx - 14, cy)))
         if (snapshot.aim_target is not None
                 and (snapshot.state is GameState.PLAYER_AIM
                      or (snapshot.state is GameState.PAUSED
@@ -66,7 +83,8 @@ class Renderer:
         self._center_text(
             screen,
             f"HP {snapshot.hp}/{snapshot.max_hp}    "
-            f"MP {snapshot.mp}/{snapshot.max_mp}    BP {snapshot.bp}",
+            f"MP {snapshot.mp}/{snapshot.max_mp}    BP {snapshot.bp}"
+            + (f" (+{snapshot.pending_bp} pending)" if snapshot.pending_bp else ""),
             500,
         )
         if snapshot.state is not GameState.PAUSED:
