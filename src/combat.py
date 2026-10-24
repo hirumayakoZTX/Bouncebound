@@ -45,7 +45,7 @@ class Combat:
 
     def targets(self) -> tuple[Target, ...]:
         targets = [Target(enemy.enemy_id, enemy.bounds)
-                   for enemy in self.enemies.values() if enemy.alive]
+                   for enemy in self.enemies.values() if enemy.active]
         targets.extend(Target(crystal.crystal_id, crystal.bounds, reflects=False)
                        for crystal in self.crystals.values() if not crystal.collected)
         return tuple(sorted(targets, key=lambda target: target.target_id))
@@ -76,7 +76,7 @@ class Combat:
             for enemy in sorted(self.enemies.values(), key=lambda item: item.enemy_id):
                 distance = max(abs(enemy.grid_col - bomb.grid_col),
                                abs(enemy.grid_row - bomb.grid_row))
-                if enemy.alive and distance == 1:
+                if enemy.active and distance == 1:
                     self._damage(enemy.enemy_id, BOMB_DAMAGE, "explosion")
 
     def handle_hit(self, event: HitEvent) -> None:

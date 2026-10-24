@@ -73,6 +73,8 @@ class Game:
                 # Do not charge a new shot or a resumed shot for the prior frame.
                 if previous_state is self.world.state is GameState.SHOT_ANIMATION:
                     self.world.advance_time(elapsed)
+                elif self.world.state is GameState.TURN_RESOLVE:
+                    self.world.resolve_turn()
                 renderer.draw(screen, self.world.snapshot())
                 pygame.display.flip()
                 elapsed = clock.tick(TARGET_FPS) / 1000.0

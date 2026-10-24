@@ -22,6 +22,14 @@ class Renderer:
         elif snapshot.state is GameState.STAGE_INTRO:
             self._center_text(screen, f"Stage {snapshot.stage}", 240, heading=True)
             self._center_text(screen, "Enter: Continue", 320)
+        elif snapshot.state is GameState.GAME_OVER:
+            self._center_text(screen, "Game Over", 220, heading=True)
+            self._center_text(screen, f"Stage {snapshot.stage} | Turn {snapshot.turn_index}", 280)
+            self._center_text(
+                screen, f"HP {snapshot.hp}/{snapshot.max_hp} | "
+                f"MP {snapshot.mp}/{snapshot.max_mp} | BP {snapshot.bp}", 320,
+            )
+            self._center_text(screen, "Close the window to exit", 380)
         elif snapshot.state in ACTIVE_STATES or snapshot.state is GameState.PAUSED:
             self._draw_battlefield(screen, snapshot)
             if snapshot.state is GameState.PAUSED:
@@ -56,9 +64,14 @@ class Renderer:
         for crystal in snapshot.crystals:
             cx = (crystal.bounds.left + crystal.bounds.right) / 2
             cy = (crystal.bounds.top + crystal.bounds.bottom) / 2
+            rx, ry = 14, 17
+            if any((enemy.grid_col, enemy.grid_row) == (crystal.grid_col, crystal.grid_row)
+                   for enemy in snapshot.enemies):
+                cx, cy = crystal.bounds.right - 8, crystal.bounds.top + 8
+                rx, ry = 5, 6
             pygame.draw.polygon(screen, (74, 172, 255),
-                                ((cx, cy - 17), (cx + 14, cy),
-                                 (cx, cy + 17), (cx - 14, cy)))
+                                ((cx, cy - ry), (cx + rx, cy),
+                                 (cx, cy + ry), (cx - rx, cy)))
         if (snapshot.aim_target is not None
                 and (snapshot.state is GameState.PLAYER_AIM
                      or (snapshot.state is GameState.PAUSED
@@ -75,11 +88,13 @@ class Renderer:
         for projectile in snapshot.projectiles:
             pygame.draw.circle(screen, (255, 225, 133), projectile.position, projectile.radius)
         if snapshot.state is GameState.PLAYER_AIM:
-            self._center_text(screen, "Waiting for input", 472)
+            feedback = (f"Enemy phase {snapshot.last_resolved_turn} complete | "
+                        if snapshot.last_resolved_turn is not None else "")
+            self._center_text(screen, feedback + "Waiting for input", 472)
         elif snapshot.state is GameState.SHOT_ANIMATION:
             self._center_text(screen, "Orb in flight", 472)
         elif snapshot.state is GameState.TURN_RESOLVE:
-            self._center_text(screen, "Turn resolution pending (prototype stops here)", 472)
+            self._center_text(screen, "Resolving enemy phase", 472)
         self._center_text(
             screen,
             f"HP {snapshot.hp}/{snapshot.max_hp}    "

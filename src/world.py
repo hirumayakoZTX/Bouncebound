@@ -13,10 +13,13 @@ from src.projectile import FixedStepPhysics, HitEvent, Projectile, ProjectileSna
 from src.projectile import firing_velocities
 from src.combat import Combat
 from src.demo import create_demo_combat
-from src.entities import Crystal, CrystalSnapshot, Enemy, EnemySnapshot
+from src.entities import (
+    Crystal, CrystalSnapshot, Enemy, EnemySnapshot, EnemyTurnContext, validate_damage,
+)
+from src.turns import resolve_enemy_phase
 
 
-# Combat and stage conditions remain the responsibility of future systems.
+# Action eligibility is checked by the controller before requesting scene edges.
 _ACTION_END_STATES = frozenset({
     GameState.TURN_RESOLVE,
     GameState.STAGE_CLEAR,
@@ -27,7 +30,7 @@ _TRANSITIONS = {
     GameState.MENU: frozenset({GameState.STAGE_INTRO}),
     GameState.STAGE_INTRO: frozenset({GameState.PLAYER_AIM}),
     GameState.PLAYER_AIM: frozenset({
-        GameState.SHOT_ANIMATION, GameState.SPELL_ANIMATION,
+        GameState.SHOT_ANIMATION, GameState.SPELL_ANIMATION, GameState.GAME_OVER,
     }),
     GameState.SHOT_ANIMATION: _ACTION_END_STATES,
     GameState.SPELL_ANIMATION: _ACTION_END_STATES,
@@ -61,6 +64,7 @@ class WorldSnapshot:
     enemies: tuple[EnemySnapshot, ...]
     crystals: tuple[CrystalSnapshot, ...]
     pending_bp: int
+    last_resolved_turn: int | None
 
 
 class World:
@@ -113,6 +117,8 @@ class World:
         self._physics = FixedStepPhysics()
         self._next_projectile_id = 1
         self.combat = create_demo_combat() if self._demo else Combat()
+        self._pending_turn: int | None = None
+        self.last_resolved_turn: int | None = None
 
     def start_new_run(self) -> None:
         self.reset()
@@ -192,6 +198,7 @@ class World:
                             for index, velocity in enumerate(velocities)]
         self._next_projectile_id += len(velocities)
         self._physics.accumulator = 0.0
+        self._pending_turn = self.turn_index
         return self.transition_to(GameState.SHOT_ANIMATION)
 
     def advance_time(
@@ -211,6 +218,56 @@ class World:
             self.transition_to(GameState.TURN_RESOLVE)
         return events
 
+    def apply_player_damage(self, amount: int) -> int:
+        """Apply a gameplay damage event and return actual HP lost after clamping."""
+        validate_damage(amount)
+        if self.state not in ACTIVE_STATES:
+            return 0
+        previous_hp = max(0, self.hp)
+        self.hp = max(0, previous_hp - amount)
+        if self.hp == 0:
+            self._pending_turn = None
+            self.transition_to(GameState.GAME_OVER)
+        return previous_hp - self.hp
+
+    def check_stage_end(self) -> bool:
+        """No encounter-clear rule exists yet, including for an empty demo.
+
+        A future encounter controller may claim stage completion here. Until it
+        handles the scene change, a True result defers the enemy phase unchanged.
+        """
+        return False
+
+    def resolve_turn(self) -> bool:
+        """Resolve one completed shot exactly once, without requiring a draw call."""
+        if (self.state is not GameState.TURN_RESOLVE
+                or self._pending_turn != self.turn_index
+                or any(orb.active for orb in self.projectiles)):
+            return False
+        if self.hp <= 0:
+            self._pending_turn = None
+            self.transition_to(GameState.GAME_OVER)
+            return True
+        self.bp = self.combat.finish_shot(self.bp)
+        if self.check_stage_end():
+            return False
+        # Claim the action before invoking hooks, preventing repeated/reentrant phases.
+        self._pending_turn = None
+        context = EnemyTurnContext(
+            turn_index=self.turn_index,
+            damage_player=self.apply_player_damage,
+            player_defeated=lambda: self.hp <= 0 or self.state is GameState.GAME_OVER,
+        )
+        resolve_enemy_phase(self.enemies.values(), context)
+        self.last_resolved_turn = self.turn_index
+        if self.hp <= 0 or self.state is GameState.GAME_OVER:
+            if self.state is not GameState.GAME_OVER:
+                self.transition_to(GameState.GAME_OVER)
+        else:
+            self.turn_index += 1
+            self.transition_to(GameState.PLAYER_AIM)
+        return True
+
     def snapshot(self) -> WorldSnapshot:
         return WorldSnapshot(
             state=self.state,
@@ -229,9 +286,10 @@ class World:
             projectiles=tuple(orb.snapshot() for orb in self.projectiles if orb.active),
             enemies=tuple(enemy.snapshot() for enemy in sorted(
                 self.enemies.values(), key=lambda enemy: enemy.enemy_id
-            ) if enemy.alive),
+            ) if enemy.active),
             crystals=tuple(crystal.snapshot() for crystal in sorted(
                 self.crystals.values(), key=lambda crystal: crystal.crystal_id
             ) if not crystal.collected),
             pending_bp=self.pending_bp,
+            last_resolved_turn=self.last_resolved_turn,
         )

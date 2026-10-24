@@ -1,5 +1,6 @@
-"""Static grid enemies and collectibles without rendering dependencies."""
+"""Grid enemies and collectibles without rendering dependencies."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -19,6 +20,18 @@ def cell_bounds(col: int, row: int) -> Bounds:
 def validate_id(entity_id: int) -> None:
     if type(entity_id) is not int or entity_id < 1:
         raise ValueError("Entity IDs must be positive integers")
+
+
+def validate_damage(amount: int) -> None:
+    if type(amount) is not int or amount < 0:
+        raise ValueError("Damage must be a nonnegative integer")
+
+
+@dataclass(frozen=True)
+class EnemyTurnContext:
+    turn_index: int
+    damage_player: Callable[[int], int]
+    player_defeated: Callable[[], bool]
 
 
 class EnemyType(Enum):
@@ -46,6 +59,10 @@ class Enemy:
     hp: int = field(default=5, init=False)
     max_hp: int = field(default=5, init=False)
     contact_damage: int = field(default=5, init=False)
+    turns_alive: int = field(default=0, init=False)
+    last_action_turn: int | None = field(default=None, init=False)
+    escaped: bool = field(default=False, init=False)
+    escape_turn: int | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         validate_id(self.enemy_id)
@@ -56,6 +73,10 @@ class Enemy:
     @property
     def alive(self) -> bool:
         return self.hp > 0
+
+    @property
+    def active(self) -> bool:
+        return self.alive and not self.escaped
 
     @property
     def score_value(self) -> int:
@@ -72,12 +93,33 @@ class Enemy:
 
     def take_damage(self, amount: int) -> bool:
         """Clamp HP and return whether this call caused the living-to-dead edge."""
-        if type(amount) is not int or amount < 0:
-            raise ValueError("Damage must be a nonnegative integer")
-        if not self.alive:
+        validate_damage(amount)
+        if not self.active:
             return False
         self.hp = max(0, self.hp - amount)
         return not self.alive
+
+    def on_turn(self, context: EnemyTurnContext) -> bool:
+        """Claim one action per turn; Basic Slimes and Bombs have no active ability."""
+        if not self.active or self.last_action_turn == context.turn_index:
+            return False
+        self.last_action_turn = context.turn_index
+        self.turns_alive += 1
+        return True
+
+    def advance_one_cell(self) -> bool:
+        if not self.active or self.grid_col >= GRID_COLUMNS - 1:
+            return False
+        self.grid_col += 1
+        return True
+
+    def escape(self, turn_index: int) -> bool:
+        """Archive defense-line removal separately from combat death."""
+        if not self.active or self.grid_col != GRID_COLUMNS - 1:
+            return False
+        self.escaped = True
+        self.escape_turn = turn_index
+        return True
 
     def snapshot(self) -> EnemySnapshot:
         return EnemySnapshot(self.enemy_id, self.enemy_type, self.grid_col, self.grid_row,
