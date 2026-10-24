@@ -1,5 +1,25 @@
-"""Application display settings, independent of Pygame initialization."""
+"""Shared display and battlefield geometry, independent of Pygame."""
 
 WINDOW_TITLE = "Bouncebound: Familiar Defense"
 LOGICAL_SIZE = (960, 576)
 TARGET_FPS = 60
+
+TILE_SIZE = 48
+GRID_COLUMNS = 14
+GRID_ROWS = 8
+BATTLEFIELD_ORIGIN = (96, 72)
+BATTLEFIELD_SIZE = (GRID_COLUMNS * TILE_SIZE, GRID_ROWS * TILE_SIZE)
+PLAYER_X = 824
+INITIAL_PLAYER_ROW = 3
+AIM_ORIGIN_OFFSET = 16
+
+ORB_SPEED = 520.0
+ORB_RADIUS = 7.0
+ORB_DAMAGE = 5
+ORB_MAX_HITS = 12
+ORB_MAX_LIFETIME = 5.0
+PHYSICS_STEP = 1.0 / 120.0
+MAX_PHYSICS_STEPS = 30
+MAX_STEP_CONTACTS = 16
+MAX_BP = 5
+BOMB_DAMAGE = 10
