@@ -31,6 +31,7 @@ def world_in_state(state: GameState) -> World:
         return world
     paths = {
         GameState.MENU: (),
+        GameState.INSTRUCTIONS: (GameState.INSTRUCTIONS,),
         GameState.STAGE_INTRO: (GameState.STAGE_INTRO,),
         GameState.PLAYER_AIM: (GameState.STAGE_INTRO, GameState.PLAYER_AIM),
     }
@@ -87,6 +88,7 @@ class SceneTests(unittest.TestCase):
 
     def test_escape_is_scene_specific(self) -> None:
         expected = {
+            GameState.INSTRUCTIONS: GameState.MENU,
             GameState.PLAYER_AIM: GameState.PAUSED,
             GameState.SHOT_ANIMATION: GameState.PAUSED,
             GameState.SPELL_ANIMATION: GameState.PAUSED,

@@ -52,6 +52,8 @@ Audio hardware is not initialized or required.
 ## Controls and current functionality
 
 - **Enter** at the menu starts a fresh run and shows the stage introduction.
+- **I** at the menu opens Instructions. **Left / Right** (or **Page Up / Page Down**)
+  changes its two pages; **Escape / Backspace** returns to the menu without starting a run.
 - **Enter** at the introduction opens the placeholder battlefield.
 - **W / Up Arrow** and **S / Down Arrow** move one row up and down while aiming.
 - **Move the mouse inside the arena** to preview the initial firing direction.
@@ -247,6 +249,83 @@ the arena. Simultaneous wall-corner contacts reverse both velocity components.
 Physics uses 1/120-second steps, capped at 30 steps per frame. Frame time above
 0.25 seconds is discarded to bound work during stalls, so simulation slows under
 severe stalls instead of accumulating a catch-up backlog.
+
+## Combat HUD
+
+The combat interface keeps the 960 × 576 canvas and fixed battlefield. Resource
+panels sit above the arena; effects, selected-spell details, feedback, and compact
+spell shortcuts sit below it. No panel covers the battlefield or player lane.
+
+- **HP** shows current/max health and a health bar. Low health also uses a warning
+  color; the numeric value stays visible after damage, healing, and revival.
+- **MP** shows current/max mana and a mana bar. It changes only through existing
+  spell payments; rejected casts are free and MP does not regenerate passively.
+- **BP** shows current/max BP and five volley pips. Filled pips are available for
+  the next shot. Outlined amber pips and `+N pending` mark collected rewards that
+  have not settled yet. BP is not ammunition and is not consumed by shooting.
+- **Stage / Turn / Waves** report the current encounter. Boss progress is shown
+  separately as pending or the number still alive; bosses do not add scripted waves.
+- **Selected spell** shows its number key, name, MP cost, and actual availability.
+  A cooldown displays the absolute ready turn and turns remaining. Other failures
+  explain MP, targeting, full-HP Cure, or used Reraise restrictions. Animations and
+  pause explicitly mark actions unavailable. Shortcut tags `S2` and `S3` indicate
+  stage locks; selecting a locked spell leaves the current selection unchanged.
+- **Effects** use `!` for harmful and `+` for beneficial effects. `Nt` is the model's
+  remaining effective turns, not seconds. Doom shows its countdown; Reraise shows
+  `1-use` without a fabricated duration. Consumed or expired effects disappear
+  when the model removes them. Tile information shows the number of PoisonTiles
+  and, when applicable, the current row's duration and Levitation protection.
+- **Feedback** preserves the latest selection or cast message until replaced by
+  the model. It does not independently time out or generate combat events.
+  Movement/aiming/selection remain free; one successful shot or spell uses the action.
+- **Score: —** reserves space for a future score display. Scoring and persistence
+  are not implemented; the dash is not an earned score of zero.
+
+The HUD uses bundled Pygame fonts and procedural panels, so it works with an empty
+optional asset directory and needs no audio device. Sprite caching and procedural
+fallbacks remain active. Long future feedback is wrapped and, if necessary,
+ellipsized rather than scaled into tiny text. Combat information remains visible
+above the pause overlay.
+
+## Menus, field guide, and end screens
+
+The menu, stage introductions, pause overlay, and end screens share dark panels,
+pixel borders, high-contrast text, and restrained color accents. The menu's hints
+are keyboard commands: Enter starts, I opens Instructions, and Escape quits.
+They are not mouse buttons. Instructions use two pages of compact sections for
+movement, turns, BP, spells and unlocks, statuses, progression, pause, and restart.
+Viewing or paging the guide does not start an encounter or change resources.
+
+Each stage introduction names the stage and its final encounter: Ultros and
+Typhon, Chichu, then Odin. It also shows the configured wave count and unlocked
+spells. Enter continues; the first wave appears when gameplay begins. Held-key
+repeat events cannot skip introductions, flip help pages, or toggle pause.
+
+Escape during gameplay opens a translucent pause panel with control reminders.
+The battlefield stays recognizable and the combat HUD remains legible. Aiming,
+projectiles, spell time, pending actions, statuses, hazards, and enemy actions stay
+frozen. Escape resumes the exact previous phase without charging the paused
+frame's elapsed time.
+
+Stage Clear shows the cleared stage, turn, HP, MP, and BP. Enter: Next Stage is
+shown only when advancement is authorized and the next stage exists. Game Over
+shows the actual failure reason: depleted HP or a required enemy escaping the
+defense line. Defense failure can occur with positive HP and never offers stage
+advancement. Both screens offer R: Restart Run.
+
+The third stage ends in Victory. Enter opens Results with the final stage, turn,
+and remaining resources. Its `Score: —` placeholder is unavailable data, not a
+numerical score; no kill totals, bonuses, records, or save files are fabricated.
+R from Stage Clear, Game Over, Victory, or Results returns to a fresh Stage 1
+Intro through the full campaign reset. R does not restart active gameplay.
+
+All screens work without optional artwork or an audio device. The menu uses the
+original guardian sprite when available and a procedural crest otherwise.
+Missing or corrupt images use cached fallbacks; no online resources are needed.
+To check navigation, press I at the menu, Right, Left, and Backspace; then start
+with Enter. During play, pause/resume while aiming and during a shot or spell.
+Use the complete campaign routes below to check introductions, Stage Clear,
+Victory, Results, and restart.
 
 ## Assets and pixel rendering
 
@@ -575,7 +654,9 @@ src/
   entities.py           Grid enemies, statistics, crystals, and snapshots
   enemy_abilities.py    Deterministic enemy attacks, statuses, hazards, and Odin cycle
   game.py               Window, loop, events, and shutdown
-  renderer.py           Cached sprites, procedural fallbacks, and existing HUD
+  renderer.py           Battlefield, sprite, HUD, and screen coordination
+  screens.py            Read-only menus, field guide, intros, pause, and end screens
+  hud.py                Read-only combat panels, resource bars, spell/status feedback
   assets.py             Optional image/sound loading, pixel scaling, and caches
   states.py             Shared scene and turn-phase names
   turns.py              Stable enemy action, movement, and contact resolution
@@ -603,6 +684,7 @@ tests/
   test_encounter_integration.py  End screens, input, and repeatable application runs
   test_world.py         Deterministic controller and transition tests
   test_scenes.py        Scene input and rendering checks
+  test_screens.py       Screen navigation, help, layouts, pause, caches, campaign determinism
   test_player_input.py  Movement and aiming rules
   test_projectile.py    Geometry, ricochets, contact events, and timing
   test_collision_eligibility.py  Surface-contact and penetration regressions
@@ -628,6 +710,7 @@ tests/
   test_hazards.py        Floor placement, duration, and defensive precedence
   test_assets.py         Loading, caches, pixel scaling, failures, and safe audio
   test_asset_rendering.py  Placement, read-only fallbacks, and complete campaign rendering
+  test_hud.py            Layout, resources, restrictions, statuses, caches, campaign determinism
 ```
 
 Scoring, persistence, final artwork, and automatic gameplay audio cues are not available.

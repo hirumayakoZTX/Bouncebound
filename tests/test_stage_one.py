@@ -292,7 +292,7 @@ class CanonicalStageOneTests(unittest.TestCase):
             self.assertIn('U15',labels);self.assertIn('T15',labels)
         self.assertEqual(vars(world),before)
         perform_action(world,'fire',2);perform_action(world,'starstorm',5);perform_action(world,'shot',5)
-        with patch.object(renderer,'_center_text',wraps=renderer._center_text) as text:
+        with patch.object(renderer.screens,'_text',wraps=renderer.screens._text) as text:
             renderer.draw(screen,world.snapshot())
             labels=[call.args[1] for call in text.call_args_list]
         self.assertIn('Stage 1 encounter complete',labels)

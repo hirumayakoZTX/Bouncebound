@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault('SDL_VIDEODRIVER','dummy')
 os.environ.setdefault('PYGAME_HIDE_SUPPORT_PROMPT','1')
@@ -324,13 +325,18 @@ class StageThreeCampaignTests(unittest.TestCase):
             def render(self,text,*args):texts.append(text);return self.font.render(text,*args)
         renderer.body_font=Font(renderer.body_font);renderer.hud_font=Font(renderer.hud_font)
         before=deepcopy(vars(w));snap=w.snapshot()
-        for state in (GameState.PLAYER_AIM,GameState.PAUSED,GameState.VICTORY,GameState.RESULTS):
-            renderer.draw(screen,replace(snap,state=state))
+        with patch.object(renderer.hud, '_text', wraps=renderer.hud._text) as hud_text, \
+             patch.object(renderer.screens, '_text', wraps=renderer.screens._text) as screen_text:
+            for state in (GameState.PLAYER_AIM,GameState.PAUSED,GameState.VICTORY,GameState.RESULTS):
+                renderer.draw(screen,replace(snap,state=state))
+        texts.extend(call.args[1] for call in hud_text.call_args_list)
+        texts.extend(call.args[1] for call in screen_text.call_args_list)
         self.assertEqual(vars(w),before);self.assertEqual(w.snapshot(),snap)
-        for text in ('Mn10','D12','T!17','G15','O50','Status: DOOM 5','Stage 3 | Turn 1',
-                     'HP 100/100 | MP 100/100 | BP 1','Enter: Results','Press R to Restart'):
+        for text in ('Mn10','D12','T!17','G15','O50','! DOOM 5t','Stage 3 | Turn 1',
+                     'HP 100/100','MP 100/100','BP 1/5','Enter: Results','R: Restart Run'):
             self.assertIn(text,texts)
-        self.assertFalse(any('score' in t.lower() for t in texts))
+        self.assertIn('Score: —',texts)
+        self.assertFalse(hasattr(snap,'score'))
 
     def test_no_scoring_or_save_files_are_created_by_campaign_actions(self):
         previous=Path.cwd()

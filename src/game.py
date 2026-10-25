@@ -36,6 +36,21 @@ class Game:
         if event.type != pygame.KEYDOWN:
             return
 
+        # Navigation repeats must not skip help pages or toggle pause twice.
+        if getattr(event, "repeat", False):
+            return
+        if self.world.state is GameState.INSTRUCTIONS:
+            if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                self.world.transition_to(GameState.MENU)
+            elif event.key in (pygame.K_LEFT, pygame.K_PAGEUP):
+                self.world.change_instructions_page(-1)
+            elif event.key in (pygame.K_RIGHT, pygame.K_PAGEDOWN):
+                self.world.change_instructions_page(1)
+            return
+        if event.key == pygame.K_i and self.world.state is GameState.MENU:
+            self.world.transition_to(GameState.INSTRUCTIONS)
+            return
+
         if event.key == pygame.K_RETURN and not getattr(event, "repeat", False):
             if self.world.state is GameState.MENU:
                 self.world.start_new_run()
