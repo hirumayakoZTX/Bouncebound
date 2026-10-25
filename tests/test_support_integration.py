@@ -12,6 +12,7 @@ import pygame
 
 from src.constants import LOGICAL_SIZE
 from src.game import Game
+from prototype_fixtures import prototype_game
 from src.renderer import Renderer
 from src.spells import SpellFailure
 from src.states import GameState
@@ -20,7 +21,7 @@ from src.statuses import StatusEffect, StatusKind
 
 class SupportIntegrationTests(unittest.TestCase):
     def setUp(self):
-        self.game = Game()
+        self.game = prototype_game()
         self.game.running = True
         self.game.world.start_new_run()
         self.game.world.transition_to(GameState.PLAYER_AIM)

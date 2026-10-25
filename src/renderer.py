@@ -25,12 +25,15 @@ class Renderer:
         elif snapshot.state is GameState.STAGE_INTRO:
             self._center_text(screen, f"Stage {snapshot.stage}", 240, heading=True)
             if snapshot.total_waves:
-                self._center_text(screen, f"Prototype: {snapshot.total_waves} scripted waves", 285)
+                self._center_text(screen, (f"Stage 1: {snapshot.total_waves} waves + Ultros and Typhon"
+                                           if snapshot.has_boss_wave else
+                                           f"Prototype: {snapshot.total_waves} scripted waves"), 285)
             self._center_text(screen, "Enter: Continue", 320)
         elif snapshot.state in (GameState.GAME_OVER, GameState.STAGE_CLEAR):
             cleared = snapshot.state is GameState.STAGE_CLEAR
             self._center_text(screen, "Stage Clear" if cleared else "Game Over", 190, heading=True)
-            reason = ("Prototype encounter complete" if cleared
+            reason = ((f"Stage {snapshot.stage} encounter complete" if snapshot.has_boss_wave
+                       else "Prototype encounter complete") if cleared
                       else snapshot.game_over_reason.value if snapshot.game_over_reason
                       else "Player HP depleted" if snapshot.hp <= 0 else "Run ended")
             self._center_text(screen, reason, 240)
@@ -66,7 +69,9 @@ class Renderer:
         self._center_text(
             screen, f"Stage {snapshot.stage}    Turn {snapshot.turn_index}"
             + (f"    Waves {snapshot.spawned_waves}/{snapshot.total_waves}"
-               if snapshot.total_waves else ""), 32
+               if snapshot.total_waves else "")
+            + ((f"    Bosses {snapshot.bosses_remaining}/{snapshot.boss_total}" if snapshot.boss_wave_spawned
+                else "    Bosses pending") if snapshot.has_boss_wave else ""), 32
         )
         arena = pygame.Rect(BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE)
         pygame.draw.rect(screen, (30, 43, 63), arena)
@@ -77,14 +82,18 @@ class Renderer:
             for effect in snapshot.statuses
         )
         self._hud_text(screen, "Status: " + statuses if statuses else
-                       "Green: Slime | Red: Bomb | Blue: BP Crystal", 56)
+                       "Green: Slime | Red: Bomb | Purple: Ultros | Gold: Typhon | Blue: BP", 56)
         for enemy in snapshot.enemies:
             rect = pygame.Rect(enemy.bounds.left, enemy.bounds.top,
                                enemy.bounds.right - enemy.bounds.left,
                                enemy.bounds.bottom - enemy.bounds.top)
-            color = (81, 158, 105) if enemy.enemy_type is EnemyType.BASIC else (190, 75, 79)
+            color, prefix = {
+                EnemyType.BASIC: ((81, 158, 105), "S"),
+                EnemyType.BOMB: ((190, 75, 79), "B"),
+                EnemyType.ULTROS: ((148, 100, 204), "U"),
+                EnemyType.TYPHON: ((205, 151, 59), "T"),
+            }[enemy.enemy_type]
             pygame.draw.rect(screen, color, rect, border_radius=6)
-            prefix = "S" if enemy.enemy_type is EnemyType.BASIC else "B"
             label = self.body_font.render(f"{prefix}{enemy.hp}", True, (255, 255, 255))
             screen.blit(label, label.get_rect(center=rect.center))
         for crystal in snapshot.crystals:

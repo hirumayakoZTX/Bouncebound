@@ -5,7 +5,6 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from math import isfinite
 
-from config.prototype import PROTOTYPE
 from src.constants import (
     AIM_ORIGIN_OFFSET, BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE,
     GRID_ROWS, INITIAL_PLAYER_ROW, PLAYER_X, TILE_SIZE,
@@ -21,7 +20,7 @@ from src.entities import (
     Crystal, CrystalSnapshot, Enemy, EnemySnapshot, EnemyTurnContext, validate_damage,
 )
 from src.turns import resolve_enemy_phase
-from src.stage_config import validate_stage_registry
+from src.stage_config import load_stage, validate_stage_registry
 from src.spells import (
     SpellContext, SpellEngine, SpellFailure, SpellId, SpellResult, StatusCheck, get_spell,
 )
@@ -33,6 +32,9 @@ from src.support_spells import SupportSpellResult, execute_support
 from src.player_actions import (
     ActionKind, MainAction, SpellHUD, SPELL_ANIMATION_SECONDS, spell_failure_message,
 )
+
+
+STAGE_ONE = load_stage("stage_01.json")
 
 
 # Action eligibility is checked by the controller before requesting scene edges.
@@ -95,6 +97,10 @@ class WorldSnapshot:
     spell_remaining: float = 0.0
     spell_result: OffensiveSpellResult | SupportSpellResult | None = None
     next_stage_available: bool = False
+    has_boss_wave: bool = False
+    boss_wave_spawned: bool = False
+    bosses_remaining: int = 0
+    boss_total: int = 0
 
 
 class World:
@@ -108,7 +114,7 @@ class World:
             raise ValueError("Encounter configuration must be an EncounterDefinition")
         if stages is not None and (demo is not None or encounter is not None):
             raise ValueError("Choose a stage registry, a single encounter, or a demo fixture")
-        definitions = stages if stages is not None else {1: encounter or PROTOTYPE}
+        definitions = stages if stages is not None else {1: encounter or STAGE_ONE}
         self._stage_definitions = validate_stage_registry(definitions)
         self._demo = demo
         self._encounter_definition = self._stage_definitions[1] if demo is None else None
@@ -241,7 +247,7 @@ class World:
 
         Each stage starts a fresh encounter clock and clears cooldowns, effects,
         Reraise allowance, histories, and identifiers along with HP/MP/BP reset.
-        The default application registers only the provisional Stage 1.
+        The default application registers only the complete Stage 1.
         """
         if not self.can_advance_stage:
             return False
@@ -505,7 +511,7 @@ class World:
         self.transition_to(GameState.GAME_OVER)
 
     def check_stage_end(self) -> bool:
-        """A prototype clears only after the final action and all required defeats."""
+        """A stage clears only after the final action and all required defeats."""
         return (self.state is GameState.TURN_RESOLVE
                 and not any(orb.active for orb in self.projectiles)
                 and not self.combat.pending_deaths and self.pending_bp == 0
@@ -535,6 +541,7 @@ class World:
         context = EnemyTurnContext(
             turn_index=self.turn_index,
             damage_player=lambda amount: self.apply_player_damage(amount, source="enemy_contact"),
+            attack_player=lambda amount: self.apply_player_damage(amount, source="boss_attack"),
             player_defeated=lambda: self.hp <= 0 or self.state is GameState.GAME_OVER,
         )
         resolve_enemy_phase(self.enemies.values(), context)
@@ -596,4 +603,9 @@ class World:
             spell_remaining=self._spell_remaining,
             spell_result=self.last_spell_result,
             next_stage_available=self.can_advance_stage,
+            has_boss_wave=self.encounter is not None and self.encounter.definition.boss_wave is not None,
+            boss_wave_spawned=self.encounter.boss_wave_spawned if self.encounter else False,
+            bosses_remaining=sum(enemy.active and enemy.is_boss for enemy in self.enemies.values()),
+            boss_total=(len(self.encounter.definition.boss_wave.spawns)
+                        if self.encounter and self.encounter.definition.boss_wave else 0),
         )

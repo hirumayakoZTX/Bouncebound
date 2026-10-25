@@ -13,9 +13,11 @@ import pygame
 
 from src.constants import LOGICAL_SIZE
 from src.game import Game
+from prototype_fixtures import prototype_game
 from src.renderer import Renderer
 from src.states import GameOverReason, GameState
 from src.world import World
+from config.prototype import PROTOTYPE
 from test_scenes import world_in_state
 
 
@@ -29,7 +31,7 @@ class EncounterIntegrationTests(unittest.TestCase):
     def test_r_restarts_terminal_scenes_and_ignores_repeat(self):
         for state in GameState:
             with self.subTest(state=state):
-                game = Game()
+                game = prototype_game()
                 game.running = True
                 game.world = world_in_state(state)
                 game.world.hp, game.world.mp, game.world.bp = 17, 9, 4
@@ -39,7 +41,7 @@ class EncounterIntegrationTests(unittest.TestCase):
                 game.handle_event(self.key(pygame.K_r))
                 if state in (GameState.GAME_OVER, GameState.STAGE_CLEAR,
                              GameState.VICTORY, GameState.RESULTS):
-                    expected = World()
+                    expected = World(encounter=PROTOTYPE)
                     expected.start_new_run()
                     self.assertEqual(vars(game.world), vars(expected))
                 else:
@@ -74,7 +76,7 @@ class EncounterIntegrationTests(unittest.TestCase):
                 self.assertEqual(vars(world), before)
 
     def test_rendering_never_spawns_future_waves_or_claims_pending_actions(self):
-        world = World()
+        world = World(encounter=PROTOTYPE)
         world.start_new_run()
         world.transition_to(GameState.PLAYER_AIM)
         world.turn_index = 7
@@ -89,7 +91,7 @@ class EncounterIntegrationTests(unittest.TestCase):
         self.assertEqual(world.encounter.spawned_waves, {0})
 
     def test_pause_freezes_wave_schedule_and_pending_turn_then_resumes_once(self):
-        game = Game()
+        game = prototype_game()
         game.running = True
         game.world.start_new_run()
         game.world.transition_to(GameState.PLAYER_AIM)
@@ -114,7 +116,7 @@ class EncounterIntegrationTests(unittest.TestCase):
         self.assertFalse(game.world.resolve_turn())
 
     def test_application_can_win_restart_lose_and_restart_without_process_restart(self):
-        game = Game()
+        game = prototype_game()
         clock = Mock()
         clock.tick.return_value = 250
         original_draw = Renderer.draw

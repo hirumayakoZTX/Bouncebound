@@ -32,11 +32,19 @@ class EnemyTurnContext:
     turn_index: int
     damage_player: Callable[[int], int]
     player_defeated: Callable[[], bool]
+    attack_player: Callable[[int], int] | None = None
 
 
 class EnemyType(Enum):
     BASIC = "basic"
     BOMB = "bomb"
+    ULTROS = "ultros"
+    TYPHON = "typhon"
+
+
+STAGE_ONE_BOSSES = frozenset({EnemyType.ULTROS, EnemyType.TYPHON})
+BOSS_HP = 15
+BOSS_ATTACK_DAMAGE = 5
 
 
 @dataclass(frozen=True)
@@ -59,6 +67,7 @@ class Enemy:
     hp: int = field(default=5, init=False)
     max_hp: int = field(default=5, init=False)
     contact_damage: int = field(default=5, init=False)
+    attack_damage: int = field(default=0, init=False)
     turns_alive: int = field(default=0, init=False)
     last_action_turn: int | None = field(default=None, init=False)
     escaped: bool = field(default=False, init=False)
@@ -67,8 +76,15 @@ class Enemy:
     def __post_init__(self) -> None:
         validate_id(self.enemy_id)
         if not isinstance(self.enemy_type, EnemyType):
-            raise ValueError("Only basic and bomb enemy types are supported")
+            raise ValueError("Enemy type must be a supported EnemyType")
         cell_bounds(self.grid_col, self.grid_row)
+        if self.is_boss:
+            self.hp = self.max_hp = BOSS_HP
+            self.attack_damage = BOSS_ATTACK_DAMAGE
+
+    @property
+    def is_boss(self) -> bool:
+        return self.enemy_type in STAGE_ONE_BOSSES
 
     @property
     def alive(self) -> bool:
@@ -80,7 +96,7 @@ class Enemy:
 
     @property
     def score_value(self) -> int:
-        return 100 if self.enemy_type is EnemyType.BASIC else 200
+        return 1000 if self.is_boss else 100 if self.enemy_type is EnemyType.BASIC else 200
 
     @property
     def bounds(self) -> Bounds:
@@ -100,11 +116,14 @@ class Enemy:
         return not self.alive
 
     def on_turn(self, context: EnemyTurnContext) -> bool:
-        """Claim one action per turn; Basic Slimes and Bombs have no active ability."""
+        """Claim once; Stage 1 bosses attack before standard movement/contact."""
         if not self.active or self.last_action_turn == context.turn_index:
             return False
         self.last_action_turn = context.turn_index
         self.turns_alive += 1
+        if self.is_boss:
+            damage = context.attack_player or context.damage_player
+            damage(self.attack_damage)
         return True
 
     def advance_one_cell(self) -> bool:

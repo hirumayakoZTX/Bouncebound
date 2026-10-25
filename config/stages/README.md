@@ -1,14 +1,17 @@
 # Stage configuration format
 
-`prototype_01.json` is the provisional Stage 1 encounter: the original four waves,
-24 enemies, four crystals, and unchanged spawn order. It is the only definition
-registered by the application. Later stages and live bosses are not available.
+`stage_01.json` is the playable Stage 1: five waves on Turns 1/3/5/7/9 with
+4/5/6/6/7 ordinary enemies, five crystals, then Ultros and Typhon. It is the only
+application-registered encounter. Later-stage content remains unavailable.
+`prototype_01.json` preserves the original four-wave, 24-enemy/four-crystal fixture
+unchanged; select it explicitly for historical regressions.
 
-Load definitions with `src.stage_config.load_stage("prototype_01.json")`.
+Load the canonical definition with `src.stage_config.load_stage("stage_01.json")`.
 Relative names resolve under this directory using the module location, independent
 of the terminal's working directory. Absolute paths support local fixture files.
 Loading and validation do not import Pygame or initialize a display.
-`config.prototype.PROTOTYPE` remains the compatible immutable export.
+`config.prototype.PROTOTYPE` remains the compatible immutable historical export.
+World uses the canonical `stage_01.json` by default.
 
 Version 1 uses the following shape. This small example illustrates the format,
 rather than replacing the shipped encounter:
@@ -61,33 +64,46 @@ The scheduler retains configuration order, per-entry spawn history, and complete
 wave tracking. A partially deferred wave is not complete. World permits spawning
 only between resolved actions and never from rendering, pause, or animations.
 
-## Future boss-wave contract
+## Boss-wave contract
 
-An optional `boss_wave` contains exactly `when` and `spawns`. Its trigger is
-`after_scripted_waves_cleared`. Entries use the same four fields as ordinary
-spawns, but reserve boss kinds: Stage 1 `ultros`/`typhon`, Stage 2 `chichu`, and
-Stage 3 `odin`. Boss IDs share the encounter namespace and must all appear in
-`mandatory_enemy_ids`. Boss cells must be distinct and the group must fit capacity.
+An optional `boss_wave` requires `when` and `spawns`, with optional `escape_policy`.
+Its trigger is `after_scripted_waves_cleared`. Entries use the same four fields as
+ordinary spawns. Stage 1 `ultros`/`typhon` are live boss kinds; Stage 2 `chichu` and
+Stage 3 `odin` remain structurally valid reservations rejected by live registration.
+Boss IDs share the encounter namespace and must all be mandatory. Boss cells must
+be distinct and the complete group must fit capacity. `escape_policy` accepts only
+`contact_and_fail`, also the compatibility default when omitted. Canonical Stage 1
+sets it explicitly: a departing boss deals normal 5-HP contact damage, is archived
+as escaped rather than killed, and prevents a successful clear. Its separate
+5-damage scheduled attack occurs before movement/contact.
 
-For example, this metadata reserves the Stage 1 boss group; it is not a playable
-boss configuration:
+The canonical Stage 1 boss metadata is:
 
 ```json
 {
   "when": "after_scripted_waves_cleared",
+  "escape_policy": "contact_and_fail",
   "spawns": [
-    {"id": 100, "kind": "ultros", "col": 0, "row": 2},
-    {"id": 101, "kind": "typhon", "col": 0, "row": 5}
+    {"id": 100, "kind": "ultros", "col": 7, "row": 2},
+    {"id": 101, "kind": "typhon", "col": 7, "row": 5}
   ]
 }
 ```
 
 `Encounter.boss_wave_ready(combat)` reports readiness only after every scripted
 entry spawned, every mandatory scripted enemy was defeated, and no ordinary enemy
-remains active. Mandatory escapes never satisfy readiness. It does not
-spawn bosses, claim reserved IDs, or allow premature completion. World rejects
-registration of boss-bearing definitions until real spawning support exists.
-There are no placeholder boss enemies or shipped boss encounters.
+remains active. Mandatory escapes never satisfy readiness. World invokes the same
+scheduler at safe boundaries, after action/combat resolution and turn advancement.
+The boss group is preflighted for capacity, cell occupancy, pending combat/BP, and
+ID conflicts before any objects or history are published. Both spawn together,
+exactly once, in configuration order. No boss attacks on arrival.
+
+`boss_wave_spawned` records activation separately from scripted `spawned_waves`.
+Completion requires actual activation and every mandatory boss defeated. An empty
+ordinary battlefield never skips the boss group. Bosses have 15 HP, take the same
+combat damage as other enemies, and attack for 5 before standard movement each
+surviving enemy phase. Only real supported bosses can be registered; no fake
+Chichu/Odin factories or later-stage configurations are installed.
 
 ## Stage lifecycle
 
@@ -100,8 +116,8 @@ An authorized clear is issued by the shared turn resolver after a completed shot
 or spell and before the enemy phase. `World.advance_stage()` requires that clear
 and a registered configuration for exactly the next stage. Missing configurations
 leave Stage Clear intact; they never create an empty battlefield. Enter can
-acknowledge a next stage when one is registered. The default prototype stays at
-Stage Clear, with R available to restart.
+acknowledge a next stage when one is registered. The default Stage 1 stays at
+Stage Clear after both bosses are defeated, with R available to restart. The historical prototype also retains its Stage Clear.
 
 Each stage starts a fresh encounter: HP/MP/BP become 100/100/1, the stage turn
 returns to 1, and player position/aim, cooldowns, commit IDs, selection/feedback,

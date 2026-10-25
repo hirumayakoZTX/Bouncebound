@@ -5,7 +5,7 @@ from enum import Enum
 from types import MappingProxyType
 
 from src.combat import Combat
-from src.entities import Crystal, Enemy, EnemyType, cell_bounds, validate_id
+from src.entities import Crystal, Enemy, EnemyType, STAGE_ONE_BOSSES, cell_bounds, validate_id
 from src.constants import GRID_COLUMNS, GRID_ROWS
 
 
@@ -45,7 +45,7 @@ class Wave:
 
 @dataclass(frozen=True)
 class BossSpawn:
-    """Validated reservation only; there is deliberately no live boss factory yet."""
+    """Validated boss placement; unsupported future kinds remain reservations."""
 
     entity_id: int
     kind: str
@@ -63,8 +63,11 @@ class BossSpawn:
 class BossWave:
     when: str
     spawns: tuple[BossSpawn, ...]
+    escape_policy: str = "contact_and_fail"
 
     def __post_init__(self) -> None:
+        if self.escape_policy != "contact_and_fail":
+            raise ValueError("Boss escape policy must be contact_and_fail")
         if self.when != "after_scripted_waves_cleared":
             raise ValueError("Boss trigger must be after_scripted_waves_cleared")
         if (not isinstance(self.spawns, tuple) or not self.spawns
@@ -136,7 +139,9 @@ class EncounterDefinition:
 
     @property
     def playable(self) -> bool:
-        return self.boss_wave is None
+        return (self.boss_wave is None or all(
+            spawn.kind in {kind.value for kind in STAGE_ONE_BOSSES}
+            for spawn in self.boss_wave.spawns))
 
 
 class EncounterOutcome(Enum):
@@ -150,6 +155,7 @@ class Encounter:
     spawned_ids: set[int] = field(default_factory=set, init=False)
     spawned_waves: set[int] = field(default_factory=set, init=False)
     spawn_history: list[int] = field(default_factory=list, init=False)
+    boss_wave_spawned: bool = field(default=False, init=False)
 
     def spawn_due(self, turn: int, combat: Combat) -> tuple[int, ...]:
         """Retry due entries in wave/config order; occupied enemy cells wait.
@@ -181,19 +187,46 @@ class Encounter:
                 spawned.append(spawn.entity_id)
             if all(spawn.entity_id in self.spawned_ids for spawn in wave.spawns):
                 self.spawned_waves.add(index)
+        spawned.extend(self.spawn_boss_wave(combat))
         return tuple(spawned)
+
+    def spawn_boss_wave(self, combat: Combat) -> tuple[int, ...]:
+        """Preflight and publish the complete implemented boss group atomically.
+
+        World calls the scheduler only at safe boundaries. A group cannot spawn
+        partially, overwrite occupants, exceed capacity, or reuse archived IDs.
+        """
+        if (not self.definition.playable or combat.pending_deaths or combat.pending_bp
+                or not self.boss_wave_ready(combat)):
+            return ()
+        spawns = self.definition.boss_wave.spawns
+        capacity = self.definition.capacity
+        active = tuple(enemy for enemy in combat.enemies.values() if enemy.active)
+        if capacity is not None and len(active) + len(spawns) > capacity:
+            return ()
+        if any((enemy.grid_col, enemy.grid_row) == (spawn.col, spawn.row)
+               for spawn in spawns for enemy in active):
+            return ()
+        if any(spawn.entity_id in combat.enemies or spawn.entity_id in combat.crystals
+               for spawn in spawns):
+            return ()
+        enemies = tuple(Enemy(spawn.entity_id, EnemyType(spawn.kind), spawn.col, spawn.row)
+                        for spawn in spawns)
+        for enemy in enemies:
+            combat.add_enemy(enemy)
+            self.spawned_ids.add(enemy.enemy_id)
+            self.spawn_history.append(enemy.enemy_id)
+        self.boss_wave_spawned = True
+        return tuple(enemy.enemy_id for enemy in enemies)
 
     @property
     def all_spawned(self) -> bool:
         return len(self.spawned_waves) == len(self.definition.waves)
 
     def boss_wave_ready(self, combat: Combat) -> bool:
-        """Future factory boundary: mandatory foes defeated and no scripted foes active.
-
-        Readiness does not spawn bosses or mark their reserved IDs as spawned.
-        World rejects boss-bearing definitions until a real factory is implemented.
-        """
-        return (self.definition.boss_wave is not None and self.all_spawned
+        """Ready once mandatory scripted foes are defeated and no ordinary foes are active."""
+        return (not self.boss_wave_spawned and self.definition.boss_wave is not None
+                and self.all_spawned
                 and not any(enemy.active for enemy in combat.enemies.values())
                 and all((enemy := combat.enemies.get(spawn.entity_id)) is not None
                         and not enemy.active
@@ -208,8 +241,8 @@ class Encounter:
         enemies = [combat.enemies.get(enemy_id) for enemy_id in self.definition.mandatory_ids]
         if any(enemy is not None and enemy.escaped for enemy in enemies):
             return EncounterOutcome.FAILED
-        if self.definition.boss_wave is not None:
-            return None  # Reserved bosses cannot be treated as defeated or silently omitted.
+        if self.definition.boss_wave is not None and not self.boss_wave_spawned:
+            return None  # Empty scripted waves do not skip the required boss group.
         if any(enemy is None for enemy in enemies):
             return None
         if all(not enemy.alive for enemy in enemies):

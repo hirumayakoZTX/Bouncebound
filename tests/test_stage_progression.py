@@ -22,6 +22,7 @@ from src.stage_config import parse_stage
 from src.states import GameState, GameOverReason
 from src.statuses import StatusKind, StatusState
 from src.world import World
+from config.prototype import PROTOTYPE
 from test_stage_config import stage_data
 
 
@@ -356,8 +357,8 @@ class StageProgressionTests(unittest.TestCase):
         self.assertEqual(set(world.stage_definitions), {1, 2, 3})
         with self.assertRaises(TypeError):world.stage_definitions[2] = definition(2)
 
-    def test_default_application_installs_only_the_provisional_stage(self):
-        world = World()
+    def test_explicit_prototype_fixture_remains_stage_one_only(self):
+        world = World(encounter=PROTOTYPE)
         self.assertEqual(set(world.stage_definitions), {1})
         for row in (3, 3, 2, 2, 4, 4, 3):
             if world.state is GameState.MENU:

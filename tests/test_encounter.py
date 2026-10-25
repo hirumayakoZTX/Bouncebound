@@ -18,7 +18,7 @@ def definition(*waves):
     return EncounterDefinition(1, tuple(waves))
 
 
-def aiming_world(encounter=None):
+def aiming_world(encounter=PROTOTYPE):
     world = World(encounter=encounter)
     world.start_new_run()
     world.transition_to(GameState.PLAYER_AIM)
@@ -351,7 +351,7 @@ class EncounterTests(unittest.TestCase):
         old_combat, old_encounter, old_physics = (self.world.combat, self.world.encounter,
                                                  self.world._physics)
         self.assertTrue(self.world.restart())
-        expected = World()
+        expected = World(encounter=PROTOTYPE)
         expected.start_new_run()
         self.assertEqual(vars(self.world), vars(expected))
         self.assertIsNot(self.world.combat, old_combat)
@@ -372,7 +372,7 @@ class EncounterTests(unittest.TestCase):
         self.world.combat.pending_bp = 3
         self.world.apply_player_damage(100)
         self.assertTrue(self.world.restart())
-        expected = World()
+        expected = World(encounter=PROTOTYPE)
         expected.start_new_run()
         self.assertEqual(vars(self.world), vars(expected))
         self.assertEqual(self.world._physics.accumulator, 0)
@@ -418,7 +418,7 @@ class EncounterTests(unittest.TestCase):
         self.assertEqual((world.hp, world.enemies[1].hp), (100, 5))
 
     def test_restart_clears_deferred_spawn_progress(self):
-        world = World()
+        world = World(encounter=PROTOTYPE)
         world.start_new_run()
         world.combat.add_enemy(Enemy(99, EnemyType.BASIC, 2, 3))
         world.transition_to(GameState.PLAYER_AIM)

@@ -14,12 +14,14 @@ import pygame
 
 from src.constants import LOGICAL_SIZE
 from src.game import Game
+from prototype_fixtures import prototype_game
 from src.player_actions import SPELL_ANIMATION_SECONDS
 from src.renderer import Renderer
 from src.spells import SpellId
 from src.states import GameState
 from src.statuses import StatusKind
 from src.world import World
+from config.prototype import PROTOTYPE
 from test_spell_actions import finish_action
 
 
@@ -29,7 +31,7 @@ class SpellUITests(unittest.TestCase):
         pygame.font.init()
         self.screen = pygame.display.set_mode(LOGICAL_SIZE)
         pygame.event.clear()
-        self.game = Game()
+        self.game = prototype_game()
         self.game.running = True
         self.game.world.start_new_run()
         self.game.world.transition_to(GameState.PLAYER_AIM)
@@ -242,7 +244,7 @@ class SpellUITests(unittest.TestCase):
         self.assertIsNone(owner.snapshot().pending_action)
 
     def test_game_loop_pause_and_resume_does_not_apply_paused_elapsed_time(self):
-        self.game = Game()
+        self.game = prototype_game()
         self.game.world = World(demo=False)
         original_draw = Renderer.draw
         clock = Mock()
@@ -283,7 +285,7 @@ class SpellUITests(unittest.TestCase):
 
     def test_same_frame_queued_spell_and_shot_commit_only_first_valid_action(self):
         for order in ('spell-first', 'shot-first'):
-            owner = World()
+            owner = World(encounter=PROTOTYPE)
             owner.start_new_run()
             owner.transition_to(GameState.PLAYER_AIM)
             self.game.world = owner

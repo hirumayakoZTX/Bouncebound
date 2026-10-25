@@ -44,7 +44,7 @@ def _spawn(value: object, location: str, *, boss: bool = False) -> Spawn | BossS
 
 
 def parse_stage(data: object) -> EncounterDefinition:
-    """Validate a decoded JSON object; boss declarations are structural reservations."""
+    """Validate decoded JSON, including live Stage 1 and reserved future boss metadata."""
     root = _object(data, {"schema_version", "stage", "waves", "completion"},
                    {"capacity", "boss_wave"}, "stage")
     if type(root["schema_version"]) is not int or root["schema_version"] != 1:
@@ -66,11 +66,12 @@ def parse_stage(data: object) -> EncounterDefinition:
         raise StageConfigurationError("capacity: expected an integer, not null or a boolean")
     boss_wave = None
     if "boss_wave" in root:
-        boss = _object(root["boss_wave"], {"when", "spawns"}, set(), "boss_wave")
+        boss = _object(root["boss_wave"], {"when", "spawns"}, {"escape_policy"}, "boss_wave")
         boss_spawns = tuple(_spawn(entry, f"boss_wave.spawns[{index}]", boss=True)
                             for index, entry in enumerate(_array(boss["spawns"], "boss_wave.spawns")))
         try:
-            boss_wave = BossWave(boss["when"], boss_spawns)
+            boss_wave = BossWave(boss["when"], boss_spawns,
+                                 boss.get("escape_policy", "contact_and_fail"))
         except ValueError as error:
             raise StageConfigurationError(f"boss_wave: {error}") from error
     try:
@@ -119,5 +120,5 @@ def validate_stage_registry(stages: Mapping[int, EncounterDefinition]) -> dict[i
                 or stage != definition.stage):
             raise StageConfigurationError("Stage registry keys must match validated stage numbers")
         if not definition.playable:
-            raise StageConfigurationError("Boss-wave spawning is not implemented; cannot register this stage")
+            raise StageConfigurationError("Unimplemented boss kinds cannot be registered for live play")
     return dict(stages)
