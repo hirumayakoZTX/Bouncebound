@@ -14,7 +14,7 @@ Ultros, Typhon, Chichu, Odin, final Victory and Results, stage progression, defe
 
 The application uses a 960 × 576 window with a 60 FPS cap, Pygame's bundled
 default font, a small set of original pixel placeholders, procedural fallbacks,
-and silence. Optional artwork may be absent without preventing play. No external
+and silent-by-default optional cues. Optional artwork may be absent without preventing play. No external
 image downloads, sound files, audio device, or online services are required.
 
 ## Install and run
@@ -47,7 +47,7 @@ If PowerShell blocks activation, use `.\.venv\Scripts\python.exe` directly in
 place of `python` for installation, execution, and tests.
 
 A window titled **Bouncebound: Familiar Defense** opens at the main menu.
-Audio hardware is not initialized or required.
+By default, audio hardware is not initialized or required.
 
 ## Controls and current functionality
 
@@ -327,6 +327,63 @@ with Enter. During play, pause/resume while aiming and during a shot or spell.
 Use the complete campaign routes below to check introductions, Stage Clear,
 Victory, Results, and restart.
 
+## Combat feedback and optional audio
+
+Shots now show a brief launch burst and actual volley count. Each authoritative
+orb leaves up to six small sampled afterimages, with distinct colors for a BP
+volley. Wall contacts show short sparks; real enemy HP loss shows an impact
+outline and a floating number. Numbers report actual HP lost, clamped at zero,
+so overkill does not fabricate additional damage. Defeated enemies dissolve into
+small marks; bosses receive a larger burst. Escapes are not rendered as deaths.
+Bomb deaths show an orange burst and neighboring-cell outlines. These indicators
+represent enemy explosion damage; they do not harm or collect blue crystals.
+
+Aiming remains an accurate **straight initial direction**: origin ring, arrow,
+line, and target marker. It moves with the player and clears for invalid aims.
+It does not predict reflected paths or promise a hit. During pause, a valid aim
+is frozen under the overlay; shooting and spell animations hide the preview.
+
+All eight spells use their committed results: Fire traces its actual target,
+Starstorm outlines its real radius-96 area, Meteor marks its selected enemies,
+Cure shows actual healing, Esuna reports the number of removed statuses,
+Levitation uses floor/lift markers, Ward uses a shield, and Reraise uses a halo.
+Actual Ward blocks, Levitation floor protection, player damage, Poison/Doom
+warnings, Tonberry Enrage, and Reraise activation have distinct compact feedback.
+A failed cast produces no successful-cast effect. Feedback never spends resources,
+applies damage, advances a turn, or decides victory.
+
+Transient effects use a bounded pool and finite lifetimes. They freeze during
+pause, discard paused elapsed time on resume, and clear on stage transitions,
+restart, and shutdown. They never keep a dead enemy in collision targets or delay
+Stage Clear. No camera shake, intense full-screen flash, or music is used.
+For fewer moving visual elements, launch with:
+
+```bash
+python main.py --no-effects
+```
+
+The HUD, screens, entity sprites/fallbacks, accurate aim guide, and full campaign
+remain available. Sound is independent of this switch and **off by default**.
+Eight small original tones are included. Opt in explicitly with:
+
+```bash
+python main.py --audio
+```
+
+Sound cues follow already-resolved shoot, bounce, enemy hit/death, spell,
+player-damage, victory, and defeat events. Resources load lazily and are cached;
+repeated drawing cannot replay cues. Pause stops outstanding short cues without
+replaying them on resume. Missing/corrupt WAVs, mixer failures, and device loss
+produce silence while gameplay continues. The cue set and simultaneous playback
+are bounded, so very dense bursts may drop presentation voices. Physical audio
+output depends on the local device. Use both flags together for sound with no
+transient visual effects.
+
+The original WAVs can be regenerated offline with
+`python -B assets/generate_cues.py`. They use no external recordings; provenance
+and license details are in [assets/CREDITS.md](assets/CREDITS.md). Empty optional
+asset folders remain supported for the entire campaign.
+
 ## Assets and pixel rendering
 
 The optional presentation resources live below `assets/`. Paths come from the
@@ -337,13 +394,15 @@ not change where resources are found.
 assets/
   CREDITS.md                     Provenance and license details
   generate_placeholders.py       Editable source maps and offline PNG generator
+  generate_cues.py               Editable original tone generator
   images/
     player/guardian.png          Original 16×16 Kite Guardian
     enemies/slime.png            Original 16×16 Moss Slime
     enemies/bomb.png             Original 16×16 Ember Capsule
     ui/bp_crystal.png            Original 16×16 Blue BP Shard
     projectiles/orb.png          Original 16×16 Amber Orb
-  sounds/README.md               Optional audio conventions; no sound files
+  sounds/README.md               Optional audio conventions
+  sounds/*.wav                  Eight original opt-in feedback tones
 ```
 
 These five original, AI-assisted pixel-map placeholders demonstrate the resource
@@ -388,14 +447,14 @@ relative to that root; absolute paths and traversal outside it are rejected.
 Invalid path/size/scale arguments are configuration errors, rather than missing
 resource fallbacks.
 
-Audio is **disabled by default** and no gameplay audio cues are wired yet.
-`AssetManager(audio_enabled=True).load_sound("sounds/shoot.wav")` provides the
-minimal optional sound contract. The mixer initializes only when explicitly
+Audio is **disabled by default**. `python main.py --audio` enables the optional
+cue router; `AssetManager(audio_enabled=True).load_sound("sounds/shoot.wav")`
+remains available for custom presentation code. The mixer initializes only when
 requesting an existing sound. Missing/corrupt files, unavailable hardware, or
 playback after device loss safely become silence. Failed device initialization
 is not retried every frame; `clear_cache()` permits an explicit retry. Sound
 handles support `play`, `stop`, `fadeout`, and `set_volume`. No assets are fetched
-from the internet, and the normal game loop never requires an audio device.
+from the internet, and the game never requires an audio device.
 
 ## Verify
 
@@ -654,7 +713,8 @@ src/
   entities.py           Grid enemies, statistics, crystals, and snapshots
   enemy_abilities.py    Deterministic enemy attacks, statuses, hazards, and Odin cycle
   game.py               Window, loop, events, and shutdown
-  renderer.py           Battlefield, sprite, HUD, and screen coordination
+  renderer.py           Battlefield, sprite, HUD, screen, and feedback coordination
+  effects.py            Bounded visual effects, trails, and optional event-driven cues
   screens.py            Read-only menus, field guide, intros, pause, and end screens
   hud.py                Read-only combat panels, resource bars, spell/status feedback
   assets.py             Optional image/sound loading, pixel scaling, and caches
@@ -685,6 +745,7 @@ tests/
   test_world.py         Deterministic controller and transition tests
   test_scenes.py        Scene input and rendering checks
   test_screens.py       Screen navigation, help, layouts, pause, caches, campaign determinism
+  test_effects.py       Event facts, lifetimes, deduplication, audio safety, and campaign invariance
   test_player_input.py  Movement and aiming rules
   test_projectile.py    Geometry, ricochets, contact events, and timing
   test_collision_eligibility.py  Surface-contact and penetration regressions
@@ -713,4 +774,4 @@ tests/
   test_hud.py            Layout, resources, restrictions, statuses, caches, campaign determinism
 ```
 
-Scoring, persistence, final artwork, and automatic gameplay audio cues are not available.
+Scoring, persistence, final artwork, and music are not available.

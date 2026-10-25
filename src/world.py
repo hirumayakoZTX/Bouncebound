@@ -13,7 +13,7 @@ from src.states import ACTIVE_STATES, GameOverReason, GameState, INSTRUCTION_PAG
 from src.collision import Target
 from src.projectile import FixedStepPhysics, HitEvent, Projectile, ProjectileSnapshot
 from src.projectile import firing_velocities
-from src.combat import Combat
+from src.combat import Combat, CombatObservation
 from src.demo import create_demo_combat
 from src.encounter import Encounter, EncounterDefinition, EncounterOutcome
 from src.entities import (
@@ -105,6 +105,7 @@ class WorldSnapshot:
     bosses_remaining: int = 0
     boss_total: int = 0
     instructions_page: int = 0
+    combat_observations: tuple[CombatObservation, ...] = ()
 
 
 class World:
@@ -412,6 +413,7 @@ class World:
             dt, self.projectiles,
             target_provider=lambda: self.combat.targets() + targets,
             on_hit=self.combat.handle_hit,
+            on_bounce=self.combat.observe_bounce,
         )
         self.projectiles = [orb for orb in self.projectiles if orb.active]
         if not self.projectiles:
@@ -596,6 +598,7 @@ class World:
         return WorldSnapshot(
             state=self.state,
             instructions_page=self.instructions_page,
+            combat_observations=self.combat.observations,
             stage=self.stage,
             turn_index=self.turn_index,
             hp=self.hp,

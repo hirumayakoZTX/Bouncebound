@@ -14,9 +14,12 @@ SPELL_KEYS = dict(zip((pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4,
 
 
 class Game:
-    def __init__(self) -> None:
+    def __init__(self, *, effects_enabled: bool = True, audio_enabled: bool = False) -> None:
         self.running = False
         self.world = World()
+        self.effects_enabled = effects_enabled
+        self.audio_enabled = audio_enabled
+        self._presentation_epoch = 0
 
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type == pygame.QUIT:
@@ -54,14 +57,17 @@ class Game:
         if event.key == pygame.K_RETURN and not getattr(event, "repeat", False):
             if self.world.state is GameState.MENU:
                 self.world.start_new_run()
+                self._presentation_epoch += 1
             elif self.world.state is GameState.STAGE_INTRO:
                 self.world.transition_to(GameState.PLAYER_AIM)
             elif self.world.state is GameState.STAGE_CLEAR:
-                self.world.advance_stage()
+                if self.world.advance_stage():
+                    self._presentation_epoch += 1
             elif self.world.state is GameState.VICTORY:
                 self.world.transition_to(GameState.RESULTS)
         elif event.key == pygame.K_r and not getattr(event, "repeat", False):
-            self.world.restart()
+            if self.world.restart():
+                self._presentation_epoch += 1
         elif event.key == pygame.K_ESCAPE:
             if self.world.state is GameState.MENU:
                 self.running = False
@@ -80,6 +86,7 @@ class Game:
                 self.world.cast_selected_spell()
 
     def run(self) -> None:
+        renderer = None
         try:
             # Only initialize required subsystems; bootstrap needs no audio device.
             pygame.display.init()
@@ -87,8 +94,11 @@ class Game:
             screen = pygame.display.set_mode(LOGICAL_SIZE)
             pygame.display.set_caption(WINDOW_TITLE)
             renderer = Renderer()
+            renderer.feedback.enabled = self.effects_enabled
+            renderer.assets.audio_enabled = self.audio_enabled
             clock = pygame.time.Clock()
             self.world.reset()
+            self._presentation_epoch += 1
             self.running = True
             elapsed = 0.0
 
@@ -106,9 +116,14 @@ class Game:
                     self.world.advance_time(elapsed)
                 elif self.world.state is GameState.TURN_RESOLVE:
                     self.world.resolve_turn()
-                renderer.draw(screen, self.world.snapshot())
+                snapshot = self.world.snapshot()
+                visual_elapsed = elapsed if previous_state is self.world.state else 0.0
+                renderer.update_feedback(snapshot, visual_elapsed, epoch=self._presentation_epoch)
+                renderer.draw(screen, snapshot)
                 pygame.display.flip()
                 elapsed = clock.tick(TARGET_FPS) / 1000.0
         finally:
+            if renderer is not None:
+                renderer.feedback.clear()
             self.running = False
             pygame.quit()

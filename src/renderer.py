@@ -10,9 +10,9 @@ from src.constants import BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE
 from src.states import ACTIVE_STATES, GameState
 from src.world import WorldSnapshot
 from src.entities import EnemyType
-from src.player_actions import SPELL_ANIMATION_SECONDS
 from src.hud import CombatHUD
 from src.screens import ScreenRenderer
+from src.effects import FeedbackLayer
 
 
 @dataclass(frozen=True)
@@ -42,16 +42,22 @@ class Renderer:
         self.hud_font = pygame.font.Font(None, 22)
         self.hud = CombatHUD()
         self.screens = ScreenRenderer()
+        self.feedback = FeedbackLayer()
+
+    def update_feedback(self, snapshot: WorldSnapshot, elapsed: float, *, epoch: int = 0) -> None:
+        self.feedback.update(snapshot, elapsed, self.assets, epoch=epoch)
 
     def draw(self, screen: pygame.Surface, snapshot: WorldSnapshot) -> None:
         screen.fill((21, 28, 44))
         if snapshot.state in ACTIVE_STATES or snapshot.state is GameState.PAUSED:
             self._draw_battlefield(screen, snapshot)
+            self.feedback.draw(screen, snapshot)
             if snapshot.state is GameState.PAUSED:
                 self.screens.draw(screen, snapshot, self.assets)
             self.hud.draw(screen, snapshot)
         else:
             self.screens.draw(screen, snapshot, self.assets)
+            self.feedback.draw(screen, snapshot)
 
     def _draw_battlefield(self, screen: pygame.Surface, snapshot: WorldSnapshot) -> None:
         arena = pygame.Rect(BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE)
@@ -118,6 +124,16 @@ class Renderer:
                 screen, (249, 211, 113), snapshot.aim_origin, snapshot.aim_target, width=1
             )
             pygame.draw.circle(screen, (249, 211, 113), snapshot.aim_target, 4, width=1)
+            ox, oy = snapshot.aim_origin
+            dx, dy = snapshot.aim_target[0] - ox, snapshot.aim_target[1] - oy
+            length = (dx*dx + dy*dy) ** .5
+            if length:
+                ux, uy = dx/length, dy/length
+                tip = (ox + ux*24, oy + uy*24)
+                pygame.draw.polygon(screen, (249, 211, 113), (tip,
+                    (tip[0]-ux*9-uy*4, tip[1]-uy*9+ux*4),
+                    (tip[0]-ux*9+uy*4, tip[1]-uy*9-ux*4)))
+            pygame.draw.circle(screen, (249, 211, 113), snapshot.aim_origin, 5, width=1)
         x, y = snapshot.player_position
         if self._draw_sprite(screen, PLAYER_SPRITE, (x, y)) is None:
             pygame.draw.circle(screen, (129, 209, 236), (x, y), 18)
@@ -127,14 +143,6 @@ class Renderer:
         for projectile in snapshot.projectiles:
             if self._draw_sprite(screen, ORB_SPRITE, projectile.position) is None:
                 pygame.draw.circle(screen, (255, 225, 133), projectile.position, projectile.radius)
-        if (snapshot.state is GameState.SPELL_ANIMATION
-                or (snapshot.state is GameState.PAUSED
-                    and snapshot.paused_state is GameState.SPELL_ANIMATION)):
-            if snapshot.spell_result is not None:
-                progress = 1.0 - snapshot.spell_remaining / SPELL_ANIMATION_SECONDS
-                pygame.draw.circle(screen, (201, 158, 255), snapshot.player_position,
-                                   24 + int(12 * progress), width=2)
-
     def _draw_sprite(self, screen: pygame.Surface, spec: SpriteSpec,
                      center: tuple[float, float], *, scale: int | None = None) -> pygame.Rect | None:
         image = self.assets.load_image(spec.path, native_size=spec.native_size,

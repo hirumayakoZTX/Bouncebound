@@ -20,9 +20,32 @@ only Pygame, initializes no display or audio, and writes only the five named PNG
 The editable maps are the corresponding source for these placeholders.
 
 The renderer still uses Pygame's bundled default font through `Font(None, size)`;
-no font file has been copied into the project. No sound files are bundled.
+no font file has been copied into the project.
 
 For each future external asset, record its actual title, category, creator,
 source URL, redistribution license, modifications, and required attribution here
 before distributing it. An online image or audio file is not automatically free
 to reuse. This table does not grant rights to third-party replacement files.
+
+## Original feedback tones
+
+The eight WAVs below are original AI-assisted mathematical tone designs created
+for this project. They contain no external recordings or extracted game audio.
+Source URL: not applicable. License: GNU GPL v3; see repository `LICENSE`.
+Modifications: generated offline from `generate_cues.py` as quiet 22050 Hz,
+16-bit mono PCM. Attribution: GPL v3 redistribution conditions; no extra terms.
+
+| Asset title | Category / file | Creator |
+|---|---|---|
+| Launch chirp | Shooting — `sounds/shoot.wav` | Bouncebound project, AI-assisted synthesis |
+| Reflection tap | Bounce — `sounds/bounce.wav` | Bouncebound project, AI-assisted synthesis |
+| Impact tick | Enemy hit — `sounds/hit.wav` | Bouncebound project, AI-assisted synthesis |
+| Dissolve thump | Death / Bomb — `sounds/death.wav` | Bouncebound project, AI-assisted synthesis |
+| Spell rise | Spell cast — `sounds/spellcast.wav` | Bouncebound project, AI-assisted synthesis |
+| Guardian impact | Player damage — `sounds/damage.wav` | Bouncebound project, AI-assisted synthesis |
+| Clear rise | Victory — `sounds/victory.wav` | Bouncebound project, AI-assisted synthesis |
+| Defense fall | Defeat — `sounds/defeat.wav` | Bouncebound project, AI-assisted synthesis |
+
+Rebuild only these WAVs with `.venv/bin/python -B assets/generate_cues.py`.
+The editable source uses Python's standard library and requires no audio device.
+Playback is optional and off by default; `python main.py --audio` opts in.
