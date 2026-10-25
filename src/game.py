@@ -36,7 +36,7 @@ class Game:
         if event.type != pygame.KEYDOWN:
             return
 
-        if event.key == pygame.K_RETURN:
+        if event.key == pygame.K_RETURN and not getattr(event, "repeat", False):
             if self.world.state is GameState.MENU:
                 self.world.start_new_run()
             elif self.world.state is GameState.STAGE_INTRO:

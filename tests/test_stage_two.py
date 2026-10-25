@@ -19,7 +19,7 @@ from src.spells import SpellId
 from src.stage_config import load_stage, parse_stage, StageConfigurationError, STAGE_DIRECTORY
 from src.states import GameState, GameOverReason
 from src.statuses import StatusKind
-from src.world import World, STAGE_ONE, STAGE_TWO
+from src.world import World, STAGE_ONE, STAGE_TWO, STAGE_THREE
 from stage_one_fixtures import perform_action, OPENING_ROWS
 from stage_two_fixtures import (definition, playing, enter_stage_two, STAGE_TWO_CLEAR,
                                 DEFENSE_AIMS, perform_aimed_shot)
@@ -61,14 +61,15 @@ class StageTwoConfigurationTests(unittest.TestCase):
         for data in variants:
             with self.assertRaises(StageConfigurationError):parse_stage(data)
 
-    def test_chichu_live_registration_and_odin_reservation_remain_atomic(self):
-        world=World();self.assertEqual(dict(world.stage_definitions),{1:STAGE_ONE,2:STAGE_TWO})
+    def test_chichu_and_odin_live_registration_remain_atomic(self):
+        world=World();self.assertEqual(dict(world.stage_definitions),{1:STAGE_ONE,2:STAGE_TWO,3:STAGE_THREE})
         data=json.loads((STAGE_DIRECTORY/'stage_02.json').read_text())
         data['stage']=3;data['completion']['final']=True;data['boss_wave']['spawns'][0]['kind']='odin'
-        reserved=parse_stage(data);self.assertFalse(reserved.playable)
+        implemented=parse_stage(data);self.assertTrue(implemented.playable)
         before=deepcopy(vars(world))
-        with self.assertRaisesRegex(ValueError,'Unimplemented boss'):
-            World(stages={1:STAGE_ONE,2:STAGE_TWO,3:reserved})
+        self.assertIsNotNone(World(stages={1:STAGE_ONE,2:STAGE_TWO,3:implemented}))
+        with self.assertRaises(ValueError):
+            World(stages={1:STAGE_ONE,2:STAGE_TWO,4:implemented})
         self.assertEqual(vars(world),before)
 
     def test_capacity_occupied_cells_partial_wave_and_retry_preserve_ids(self):
@@ -137,7 +138,8 @@ class StageTwoCampaignTests(unittest.TestCase):
     def tearDownClass(cls):pygame.quit()
 
     def test_complete_two_stage_campaign_through_posted_gameplay_events(self):
-        game=Game();game.running=True
+        # Preserve the historical two-stage terminal contract explicitly.
+        game=Game();game.world=World(stages={1:STAGE_ONE,2:STAGE_TWO});game.running=True
         for _ in range(2):pygame.event.post(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_RETURN))
         for event in pygame.event.get():game.handle_event(event)
         enter_stage_two(game.world,game=game)

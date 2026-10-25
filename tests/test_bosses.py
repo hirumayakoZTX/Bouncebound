@@ -197,7 +197,7 @@ class BossSchedulerTests(unittest.TestCase):
         self.encounter = Encounter(self.definition)
         self.encounter.spawn_due(1, self.combat)
 
-    def test_live_stage_one_boss_kinds_register_but_future_bosses_remain_reserved(self):
+    def test_live_stage_one_and_odin_boss_kinds_register_with_strict_validation(self):
         self.assertTrue(self.definition.playable)
         self.assertIsNotNone(World(encounter=self.definition))
         for stage, kind in ((3, 'odin'),):
@@ -206,8 +206,10 @@ class BossSchedulerTests(unittest.TestCase):
                 {'id': 100, 'kind': kind, 'col': 0, 'row': 3}]}
             data['completion']['mandatory_enemy_ids'].append(100)
             definition = parse_stage(data)
-            self.assertFalse(definition.playable)
-            with self.assertRaises(StageConfigurationError):World(stages={1: self.definition, stage: definition})
+            self.assertTrue(definition.playable)
+            self.assertIsNotNone(World(stages={1: self.definition, stage: definition}))
+            data['boss_wave']['spawns'][0]['kind'] = 'unknown'
+            with self.assertRaises(StageConfigurationError):parse_stage(data)
 
     def test_group_spawns_once_in_configured_order_only_after_scripted_defeat(self):
         self.assertFalse(self.encounter.boss_wave_spawned)

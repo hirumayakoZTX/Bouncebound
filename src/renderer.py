@@ -26,7 +26,7 @@ class Renderer:
             self._center_text(screen, f"Stage {snapshot.stage}", 240, heading=True)
             if snapshot.total_waves:
                 self._center_text(screen, (f"Stage {snapshot.stage}: {snapshot.total_waves} waves + "
-                                           + ("Ultros and Typhon" if snapshot.stage == 1 else "Chichu")
+                                           + {1: "Ultros and Typhon", 2: "Chichu", 3: "Odin"}[snapshot.stage]
                                            if snapshot.has_boss_wave else
                                            f"Prototype: {snapshot.total_waves} scripted waves"), 285)
             self._center_text(screen, "Enter: Continue", 320)
@@ -48,10 +48,14 @@ class Renderer:
                 self._center_text(screen, "Enter: Next stage", 420)
         elif snapshot.state in (GameState.VICTORY, GameState.RESULTS):
             self._center_text(screen, "Victory" if snapshot.state is GameState.VICTORY
-                              else "Results", 230, heading=True)
+                              else "Results", 190, heading=True)
+            self._center_text(screen, "Campaign complete", 240)
+            self._center_text(screen, f"Stage {snapshot.stage} | Turn {snapshot.turn_index}", 280)
+            self._center_text(screen, f"HP {snapshot.hp}/{snapshot.max_hp} | "
+                              f"MP {snapshot.mp}/{snapshot.max_mp} | BP {snapshot.bp}", 320)
             if snapshot.state is GameState.VICTORY:
-                self._center_text(screen, "Enter: Results", 310)
-            self._center_text(screen, "Press R to Restart", 350)
+                self._center_text(screen, "Enter: Results", 380)
+            self._center_text(screen, "Press R to Restart", 420)
         elif snapshot.state in ACTIVE_STATES or snapshot.state is GameState.PAUSED:
             self._draw_battlefield(screen, snapshot)
             if snapshot.state is GameState.PAUSED:
@@ -85,6 +89,8 @@ class Renderer:
         self._hud_text(screen, "Status: " + statuses if statuses else
                        ("C: Cactuar | A: Alligator | Bu: Bulb | M: Morbol | L: Landtrap | Ch: Chichu"
                         if snapshot.stage == 2 else
+                        "Mn: Mandragora | D: Diremite | To: Tonberry (! Enraged) | G: Gorgon | O: Odin"
+                        if snapshot.stage == 3 else
                         "Green: Slime | Red: Bomb | Purple: Ultros | Gold: Typhon | Blue: BP"), 56)
         for tile in snapshot.hazards:
             # PoisonTiles affect the player lane, never projectile collision geometry.
@@ -108,6 +114,11 @@ class Renderer:
                 EnemyType.MORBOL: ((84, 85, 157), "M"),
                 EnemyType.LANDTRAP: ((147, 91, 48), "L"),
                 EnemyType.CHICHU: ((188, 86, 27), "Ch"),
+                EnemyType.MANDRAGORA: ((111, 119, 45), "Mn"),
+                EnemyType.DIREMITE: ((65, 98, 159), "D"),
+                EnemyType.TONBERRY: ((27, 110, 97), "T!" if enemy.enraged else "To"),
+                EnemyType.GORGON: ((132, 67, 152), "G"),
+                EnemyType.ODIN: ((108, 116, 130), "O"),
             }[enemy.enemy_type]
             pygame.draw.rect(screen, color, rect, border_radius=6)
             label = self.body_font.render(f"{prefix}{enemy.hp}", True, (255, 255, 255))

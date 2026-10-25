@@ -188,13 +188,13 @@ class StageConfigTests(unittest.TestCase):
         data['completion']['mandatory_enemy_ids'] += [3, 4]
         return data
 
-    def test_future_boss_contract_validates_without_live_spawning(self):
+    def test_odin_boss_contract_now_activates_only_after_scripted_clear(self):
         data = stage_data(3)
         data['boss_wave'] = {'when': 'after_scripted_waves_cleared', 'spawns': [
             {'id': 3, 'kind': 'odin', 'col': 0, 'row': 2}]}
         data['completion']['mandatory_enemy_ids'].append(3)
         definition = parse_stage(data)
-        self.assertFalse(definition.playable)
+        self.assertTrue(definition.playable)
         combat = Combat(); encounter = Encounter(definition)
         self.assertFalse(encounter.boss_wave_ready(combat))
         encounter.spawn_due(1, combat)
@@ -202,10 +202,11 @@ class StageConfigTests(unittest.TestCase):
         combat.apply_damage(1, 5)
         self.assertTrue(encounter.boss_wave_ready(combat))
         self.assertIsNone(encounter.outcome(combat))
-        self.assertEqual(encounter.spawn_due(2, combat), ())
-        self.assertEqual(set(combat.enemies), {1})
-        with self.assertRaisesRegex(ValueError, 'Unimplemented boss'):
-            World(stages={1: PROTOTYPE, 3: definition})
+        self.assertEqual(encounter.spawn_due(2, combat), (3,))
+        self.assertEqual(set(combat.enemies), {1,3})
+        self.assertEqual(combat.enemies[3].hp,50)
+        self.assertEqual(encounter.spawn_due(3, combat), ())
+        self.assertIsNotNone(World(stages={1: PROTOTYPE, 3: definition}))
 
     def test_boss_readiness_respects_mandatory_membership_without_treating_escapes_as_kills(self):
         for mandatory in (False, True):

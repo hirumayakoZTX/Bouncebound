@@ -41,6 +41,7 @@ class EnemyTurnContext:
     place_poison_tile: Callable[[int, int, int], object] | None = None
     cell_is_free: Callable[[int, int], bool] | None = None
     ability_player: Callable[[int], int] | None = None
+    force_knockout: Callable[[], int] | None = None
 
 
 class EnemyType(Enum):
@@ -54,12 +55,19 @@ class EnemyType(Enum):
     MORBOL = "morbol"
     LANDTRAP = "landtrap"
     CHICHU = "chichu"
+    MANDRAGORA = "mandragora"
+    DIREMITE = "diremite"
+    TONBERRY = "tonberry"
+    GORGON = "gorgon"
+    ODIN = "odin"
 
 
 STAGE_ONE_BOSSES = frozenset({EnemyType.ULTROS, EnemyType.TYPHON})
 BOSS_HP = 15
 BOSS_ATTACK_DAMAGE = 5
-LIVE_BOSSES = STAGE_ONE_BOSSES | {EnemyType.CHICHU}
+LIVE_BOSSES = STAGE_ONE_BOSSES | {EnemyType.CHICHU, EnemyType.ODIN}
+STAGE_THREE_ENEMIES = frozenset({EnemyType.MANDRAGORA, EnemyType.DIREMITE,
+                                EnemyType.TONBERRY, EnemyType.GORGON, EnemyType.ODIN})
 # HP and active-attack damage. All types retain five-HP defense-line contact.
 ENEMY_STATS = MappingProxyType({
     EnemyType.BASIC: (5, 0), EnemyType.BOMB: (5, 0),
@@ -67,9 +75,12 @@ ENEMY_STATS = MappingProxyType({
     EnemyType.CACTUAR: (10, 5), EnemyType.ALLIGATOR: (12, 4),
     EnemyType.BULB: (8, 0), EnemyType.MORBOL: (18, 0),
     EnemyType.LANDTRAP: (8, 0), EnemyType.CHICHU: (30, 15),
+    EnemyType.MANDRAGORA: (10, 0), EnemyType.DIREMITE: (12, 0),
+    EnemyType.TONBERRY: (18, 3), EnemyType.GORGON: (15, 0), EnemyType.ODIN: (50, 40),
 })
 ENEMY_UNLOCK_STAGE = MappingProxyType({
-    kind: 1 if kind in {EnemyType.BASIC, EnemyType.BOMB} | STAGE_ONE_BOSSES else 2
+    kind: 3 if kind in STAGE_THREE_ENEMIES else
+    1 if kind in {EnemyType.BASIC, EnemyType.BOMB} | STAGE_ONE_BOSSES else 2
     for kind in EnemyType
 })
 
@@ -83,6 +94,8 @@ class EnemySnapshot:
     hp: int
     max_hp: int
     bounds: Bounds
+    enraged: bool = False
+    odin_phase: int | None = None
 
 
 @dataclass
@@ -99,6 +112,8 @@ class Enemy:
     last_action_turn: int | None = field(default=None, init=False)
     escaped: bool = field(default=False, init=False)
     escape_turn: int | None = field(default=None, init=False)
+    enraged: bool = field(default=False, init=False)
+    odin_phase: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
         validate_id(self.enemy_id)
@@ -138,7 +153,10 @@ class Enemy:
         validate_damage(amount)
         if not self.active:
             return False
+        before = self.hp
         self.hp = max(0, self.hp - amount)
+        if self.enemy_type is EnemyType.TONBERRY and self.hp < before:
+            self.enraged = True
         return not self.alive
 
     def on_turn(self, context: EnemyTurnContext) -> bool:
@@ -171,7 +189,8 @@ class Enemy:
 
     def snapshot(self) -> EnemySnapshot:
         return EnemySnapshot(self.enemy_id, self.enemy_type, self.grid_col, self.grid_row,
-                             self.hp, self.max_hp, self.bounds)
+                             self.hp, self.max_hp, self.bounds, self.enraged,
+                             self.odin_phase if self.enemy_type is EnemyType.ODIN else None)
 
 
 @dataclass(frozen=True)

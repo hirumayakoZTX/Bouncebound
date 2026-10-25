@@ -2,9 +2,9 @@
 
 An original, offline, turn-driven ricochet defense game inspired by Kupo Kupo
 Adventure. The current version provides a main menu, stage introduction,
-two complete playable stages with vertical movement, mouse aiming, ricocheting
+three complete playable stages with vertical movement, mouse aiming, ricocheting
 orbs, Bomb chain reactions, BP crystals, enemy abilities, statuses, floor hazards,
-Ultros, Typhon, Chichu, stage progression, defeat, restart, pause/resume, and spells.
+Ultros, Typhon, Chichu, Odin, final Victory and Results, stage progression, defeat, restart, pause/resume, and spells.
 
 ## Requirements
 
@@ -62,20 +62,23 @@ Audio hardware is not initialized or required.
   Locked selection preserves the previously selected spell.
 - **Escape** at the battlefield pauses; press it again to resume.
 - **Escape** at the menu exits. The window close button exits from any screen.
-- **R** at Stage Clear or Game Over restarts the entire run at the introduction.
-  Restart is disabled during active gameplay. **Enter** after Stage 1 Clear opens
-  Stage 2 Intro; Enter again starts Stage 2. Stage 2 Clear waits for restart.
+- **Enter** after Stage 1/2 Clear opens the next stage introduction; Enter again
+  starts that stage. Enter after final **Victory** opens **Results**.
+- **R** at Stage Clear, Game Over, Victory, or Results restarts the entire run at
+  Stage 1 Intro. Restart is disabled during active gameplay. Held Enter repeats
+  do not skip introductions or acknowledge terminal screens.
 
 New runs begin at Stage 1, Turn 1, with HP 100/100, MP 100/100, and BP 1.
 HP tracks player health; MP pays spell costs and does not regenerate passively.
-BP controls the number of orbs per shot. Stages 1 and 2 are playable.
+BP controls the number of orbs per shot. All three stages are playable.
 Fire, Starstorm, Cure, Ward, and Reraise unlock in Stage 1. Stage 2 additionally
-unlocks Esuna and Levitation. Meteor requires Stage 3, which is not playable.
+unlocks Esuna and Levitation. Stage 3 additionally unlocks Meteor.
 
 | Key | Spell | MP | Cooldown | Effect |
 |---|---|---:|---:|---|
 | 1 | Pom Fire | 30 | 3 | 20 damage to the nearest enemy in the player's row |
 | 2 | Pom Starstorm | 40 | 4 | 10 damage in a radius-96 area centered eight cells left |
+| 3 | Pom Meteor (Stage 3) | 80 | 10 | 15 direct damage to every active enemy |
 | 4 | Pom Cure | 10 | 1 | Restore up to 50 HP; requires missing HP |
 | 5 | Pom Esuna (Stage 2) | 20 | 3 | Remove Poison and Bind; preserve Doom and beneficial effects |
 | 6 | Pom Levitation (Stage 2) | 20 | 3 | Ignore floor damage during the cast's enemy phase |
@@ -113,7 +116,7 @@ finishes, up to BP 5. New BP affects the next shot, never the orbs already flyin
 
 Stage 1 loads `config/stages/stage_01.json`. The [stage configuration format](config/stages/README.md)
 documents validation and scheduling. Stage 2 loads `config/stages/stage_02.json`.
-Both encounters are registered by the application. The historical
+Stage 3 loads `config/stages/stage_03.json`. All three encounters are registered. The historical
 `prototype_01.json` remains available for regression fixtures and is not the
 application's default encounter.
 
@@ -179,7 +182,8 @@ The end screen shows stage, turn, HP, MP, and BP. Press R to reset resources,
 position, aiming, projectiles, spell history, statuses, hazards, enemies, crystals,
 boss activation, IDs, and all wave history, then Enter to play again. R is disabled
 during active turns. Enter after Stage 1 Clear opens Stage 2 Intro, then Enter
-starts its first wave. Stage 2 Clear never enters the unfinished Stage 3.
+starts its first wave. Enter after Stage 2 Clear opens Stage 3 Intro, then Enter
+starts Stage 3. Its final clear enters Victory; Enter continues to Results.
 
 Each stage starts a fresh encounter: HP/MP/BP reset to 100/100/1, Turn returns to
 1, and the player returns to row 3 with no aim. Cooldowns, spell selection and
@@ -227,7 +231,7 @@ It does not attack on arrival. Stage 2 clears after Chichu and every mandatory
 enemy are defeated and the final action finishes, before any further enemy or
 status processing. Mandatory escapes prevent success and lead to defense failure
 once scheduled spawning and active enemies finish. HP depletion is a separate
-knockout outcome. No Stage 3 content is installed.
+knockout outcome. Enter after this Stage Clear can proceed to Stage 3.
 
 The orb travels naturally across the launch gap. Top and bottom bounce planes
 extend across that gap; the right wall activates once the whole orb fits inside
@@ -261,8 +265,9 @@ turn-based cooldowns, offensive/support effects, statuses, hazards, revival,
 posted numeric/Space input, shared action ownership, animation pause timing,
 read-only HUD rendering, and restart cleanup. Stage 2 tests cover all five new
 ordinary enemies, Chichu, real status/hazard applications, two-stage posted-event
-campaigns, both defeat outcomes, and frame-rate determinism. Stage 3 tests use
-isolated model fixtures; they do not make Stage 3 playable.
+campaigns, both defeat outcomes, and frame-rate determinism. Stage 3 checks cover
+Tonberry Enrage, Gorgon countdowns, Odin cycles and defensive interactions, Meteor,
+a complete three-stage campaign through posted inputs, Victory/Results, and reset.
 The automated suite does not verify physical desktop input or platform compatibility.
 
 Manual smoke test: run `python main.py`, confirm the 960 × 576 menu, then press
@@ -334,8 +339,8 @@ for aiming to resume before the next one.
 | 18 | Shoot Chichu | 3 |
 
 Chichu arrives on Turn 18 with 30 HP. The last volley clears Stage 2 at
-**HP 95, MP 60, BP 5**. Enter must keep this Stage Clear screen; R returns to a
-fresh Stage 1 Intro. The fast clear deliberately uses Bomb clusters to prevent
+**HP 95, MP 60, BP 5**. Enter opens Stage 3 Intro; Enter again starts it.
+R instead returns to a fresh Stage 1 Intro. The fast clear deliberately uses Bomb clusters to prevent
 most abilities; the following separate check lets the new effects operate.
 
 For real status and floor feedback, enter Stage 2 fresh, shoot from rows
@@ -370,6 +375,109 @@ MP 60, BP 5. These paths use ordinary movement, aiming, shots, and spell control
 no resource or enemy-HP edits are required. Restart after success and both defeats,
 check the Stage 1 first wave, and verify clean window exit.
 
+### Stage 3
+
+Seven waves on Turns **1/4/7/10/13/16/19** contain **5/5/5/6/6/6/6** ordinary
+enemies and one crystal each: **39 ordinary enemies, seven crystals**, then Odin.
+Capacity remains 25. This is a deterministic encounter designed for this game,
+not a claimed original-game wave table. Prior-stage configurations are unchanged.
+
+| Enemy / label | HP | Ability before movement |
+|---|---:|---|
+| Mandragora / Mn | 10 | Place a two-phase PoisonTile on the player's row every third surviving phase |
+| Diremite / D | 12 | Apply two-turn Poison every second surviving phase |
+| Tonberry / To | 18 | After actual positive damage, stay Enraged and attack for 3 each surviving phase |
+| Gorgon / G | 15 | Apply or refresh a five-turn Doom countdown every second surviving phase |
+| Odin / O | 50 | Repeat SLASH (40), SLASH (40), EXECUTE (forced knockout) |
+
+Tonberry shows **T!** after damage. Zero damage and false contact do not enrage it.
+Damage from projectiles, spells, and explosions shares this same Enrage trigger.
+An injured living Tonberry first retaliates in the next enemy phase it survives;
+a lethal hit cannot produce retaliation. The state persists for that encounter.
+
+New Poison, Doom, and tiles retain their application-phase grace. Existing Poison
+and tile refreshes preserve already-earned damage without stacking. Doom refresh
+replaces the one countdown with five and skips the refresh phase; it does not
+create a parallel countdown. After its last application, five eligible phases
+count **4, 3, 2, 1, 0**, even if Gorgon has died. Esuna cannot remove Doom. Continued
+Gorgon refreshes postpone its deadline; killing a Gorgon does not cleanse it.
+
+Odin appears at **column 5, row 3** only after all required scripted enemies have
+been defeated, all entries have spawned, and a safe boundary is reached. It does
+not attack on arrival. Each surviving phase advances exactly one cycle action,
+then follows standard one-column movement and 5-HP escape contact. The cycle is
+independent of whether Ward blocks a SLASH. **EXECUTE is a forced knockout**:
+this game's explicit policy bypasses Ward and uses the same central knockout
+resolver as Doom. Reraise revives to exactly 50 HP and is then consumed. A second
+knockout without revival ends the run. The cycle repeats after EXECUTE.
+
+All 40 enemies, including Odin, are mandatory. The final authorized action must
+finish before Victory. Victory takes priority over another Odin attack, hazard,
+Poison, or Doom phase. Escaping never counts as defeat. Final HP, MP, BP, stage,
+and turn remain visible through Victory and Results. No score is calculated.
+
+### Full-game victory smoke test
+
+1. Start from the menu with Enter twice. Clear Stage 1 with horizontal shots from
+   rows **3,3,2,2,4,4,1,1,5,2,5**. Enter twice advances to Stage 2.
+2. Follow the Stage 2 clear table above. It ends on Turn 18 with HP 95, MP 60,
+   BP 5. Enter twice advances to Stage 3 with **HP/MP/BP 100/100/1**, Turn 1.
+3. On Stage 3 Turns 1–19, shoot horizontally from these rows:
+
+   **3,4,3, 2,3,2, 4,5,4, 1,2,1, 5,6,5, 2,3,2, 3**
+
+   Aim each shot at **(96, 96 + 48 × row)**. Move before shooting and wait for the
+   next aiming phase. Tonberry retaliation and Poison leave **85 HP, MP 100,
+   BP 5** when Odin arrives on Turn 20 with 50 HP.
+4. Turn 20: shoot horizontally from row **4**. Odin falls to 35 HP, then SLASH
+   leaves the player at 45 HP.
+5. Turn 21: shoot horizontally from row **3**. Odin falls to 5 HP; the second
+   SLASH leaves the player at 5 HP.
+6. Turn 22: select **3**, press Space for Meteor. Confirm MP 20 and Odin's death.
+   The animation must finish before **Victory**; EXECUTE must not occur. Enter
+   opens Results showing **Stage 3, Turn 22, HP 5, MP 20, BP 5**. R restarts at
+   Stage 1 Intro with all encounter state reset.
+
+The same route works by shooting from row 3 instead of the final Meteor; MP
+then remains 100. To demonstrate Odin's defenses, follow Turns 1–19 above, then:
+
+| Turn | Action from row 3 | Expected outcome |
+|---:|---|---|
+| 20 | Ward (7, Space) | First SLASH blocked; HP 85, MP 70 |
+| 21 | Reraise (8, Space) | Second SLASH; HP 45, MP 20 |
+| 22 | Cure (4, Space) | Heal to 95, EXECUTE, revive to 50; MP 10 |
+| 23 | Shoot | Odin 5 HP; next SLASH leaves HP 10 |
+| 24 | Shoot | Victory at HP 10, MP 10, BP 5 |
+
+Pause/resume a shot and Meteor animation. Extra clicks/Space must not create
+another action; paused time must not advance abilities, cooldowns, or statuses.
+Restart from both Victory and Results, and verify clean window exit.
+
+For Stage 3 **HP defeat**, shoot horizontally from row 0 each turn: Game Over
+occurs on Turn 12 with HP 0. For a genuine **Doom knockout**, shoot from row 0 on
+Turns 1–2, row 3 on Turn 3, then row 0 on Turns 4–7. Doom reaches zero on Turn 7.
+Casting Reraise from row 0 instead of the Turn-7 shot revives to 50 HP; it does not
+restore the encounter's Reraise casting allowance.
+
+For **defense failure**, follow the Stage 3 opening through Turn 18, then:
+
+| Turn | Player row | Action / click target |
+|---:|---:|---|
+| 19 | 0 | Shoot (740, 456) |
+| 20 | 0 | Shoot (768, 456) |
+| 21 | 0 | Esuna |
+| 22 | 0 | Levitation |
+| 23 | 0 | Ward |
+| 24 | 0 | Cure |
+| 25 | 0 | Esuna |
+| 26 | 1 | Shoot (740, 96) |
+| 27 | 1 | Shoot (480, 72) |
+| 28 | 0 | Shoot (96, 360) |
+
+Gorgon escapes with 15 HP; **Defense failed** preserves **95 player HP**, MP 0,
+BP 5. Odin must not spawn. These clear and defeat paths use ordinary controls,
+without editing resources or enemy HP. Restart always returns to Stage 1.
+
 ## Repository layout
 
 ```text
@@ -387,7 +495,7 @@ src/
   encounter.py          Validated waves, spawn deferral, and encounter outcomes
   stage_config.py       Strict JSON loader and explicit stage registry validation
   entities.py           Grid enemies, statistics, crystals, and snapshots
-  enemy_abilities.py    Deterministic Stage 2 attacks, statuses, and hazard placement
+  enemy_abilities.py    Deterministic enemy attacks, statuses, hazards, and Odin cycle
   game.py               Window, loop, events, and shutdown
   renderer.py           Asset-free scene display
   states.py             Shared scene and turn-phase names
@@ -407,6 +515,7 @@ config/
   stages/
     stage_01.json       Complete Stage 1 (five waves, Ultros, and Typhon)
     stage_02.json       Complete Stage 2 (six waves and Chichu)
+    stage_03.json       Final Stage 3 (seven waves and Odin)
     prototype_01.json   Preserved historical four-wave regression fixture
     README.md           Public JSON schema and stage lifecycle contract
 tests/
@@ -427,6 +536,8 @@ tests/
   test_stage_one.py     Canonical Stage 1 gameplay and regression paths
   test_stage_two.py     Stage 2 config, two-stage campaign, outcomes, and determinism
   test_stage_two_enemies.py  Abilities, statuses, hazards, combat, and defenses
+  test_stage_three.py   Three-stage campaign, final outcomes, config, and determinism
+  test_stage_three_enemies.py  Enrage, Doom, Odin cycles, damage, and defenses
   test_stage_config.py  Strict stage schema and prototype compatibility
   test_stage_progression.py  Fixture stage transitions and scheduler boundaries
   test_spell_actions.py  Shared main-action economy and spell turn resolution
@@ -438,4 +549,4 @@ tests/
   test_hazards.py        Floor placement, duration, and defensive precedence
 ```
 
-Stage 3 content, scoring, persistence, final artwork, and audio are not available.
+Scoring, persistence, final artwork, and audio are not available.

@@ -36,6 +36,7 @@ from src.player_actions import (
 
 STAGE_ONE = load_stage("stage_01.json")
 STAGE_TWO = load_stage("stage_02.json")
+STAGE_THREE = load_stage("stage_03.json")
 
 
 # Action eligibility is checked by the controller before requesting scene edges.
@@ -116,7 +117,7 @@ class World:
         if stages is not None and (demo is not None or encounter is not None):
             raise ValueError("Choose a stage registry, a single encounter, or a demo fixture")
         definitions = (stages if stages is not None else {1: encounter} if encounter is not None
-                       else {1: STAGE_ONE, 2: STAGE_TWO})
+                       else {1: STAGE_ONE, 2: STAGE_TWO, 3: STAGE_THREE})
         self._stage_definitions = validate_stage_registry(definitions)
         self._demo = demo
         self._encounter_definition = self._stage_definitions[1] if demo is None else None
@@ -249,7 +250,7 @@ class World:
 
         Each stage starts a fresh encounter clock and clears cooldowns, effects,
         Reraise allowance, histories, and identifiers along with HP/MP/BP reset.
-        The default application registers only the complete Stage 1.
+        The default application registers all three canonical encounters.
         """
         if not self.can_advance_stage:
             return False
@@ -546,6 +547,7 @@ class World:
             damage_player=lambda amount: self.apply_player_damage(amount, source="enemy_contact"),
             attack_player=lambda amount: self.apply_player_damage(amount, source="boss_attack"),
             player_defeated=lambda: self.hp <= 0 or self.state is GameState.GAME_OVER,
+            force_knockout=lambda: self.force_player_knockout(source="odin_execute"),
             player_row=self.player_row,
             ability_player=lambda amount: self.apply_player_damage(amount, source="enemy_ability"),
             apply_status=lambda kind, duration, source: self.apply_status(

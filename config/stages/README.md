@@ -2,9 +2,10 @@
 
 `stage_01.json` is the playable Stage 1: five waves on Turns 1/3/5/7/9 with
 4/5/6/6/7 ordinary enemies, five crystals, then Ultros and Typhon. It is one
-of two application-registered encounters. `stage_02.json` provides six waves on
-Turns 1/4/7/10/13/16, 29 ordinary enemies, six crystals, then Chichu. Stage 3 remains
-unavailable.
+of three application-registered encounters. `stage_02.json` provides six waves on
+Turns 1/4/7/10/13/16, 29 ordinary enemies, six crystals, then Chichu.
+`stage_03.json` provides seven waves on Turns 1/4/7/10/13/16/19, 39 ordinary
+enemies, seven crystals, then Odin.
 `prototype_01.json` preserves the original four-wave, 24-enemy/four-crystal fixture
 unchanged; select it explicitly for historical regressions.
 
@@ -13,7 +14,7 @@ Relative names resolve under this directory using the module location, independe
 of the terminal's working directory. Absolute paths support local fixture files.
 Loading and validation do not import Pygame or initialize a display.
 `config.prototype.PROTOTYPE` remains the compatible immutable historical export.
-World starts with canonical `stage_01.json` and explicitly registers `stage_02.json` next.
+World explicitly registers the three canonical stage files and starts with `stage_01.json`.
 
 Version 1 uses the following shape. This small example illustrates the format,
 rather than replacing the shipped encounter:
@@ -46,7 +47,9 @@ rather than replacing the shipped encounter:
 - `spawns` is a nonempty ordered array. Each entry requires exactly `id`, `kind`,
   `col`, and `row`. Stage 1 live ordinary kinds are `basic`, `bomb`, and `crystal`.
   Stage 2 additionally accepts `cactuar`, `alligator`, `bulb`, `morbol`, and
-  `landtrap`. These five kinds are rejected in Stage 1; bosses cannot be ordinary entries.
+  `landtrap`. Stage 3 additionally accepts `mandragora`, `diremite`, `tonberry`,
+  and `gorgon`. Enemy kinds are rejected before their unlock stage; bosses cannot
+  be ordinary entries.
   IDs are positive integers, unique across all entries in the encounter.
   Columns range from 0 through 13; rows range from 0 through 7.
 - Enemy cells cannot repeat within one wave. Crystals may share enemy cells.
@@ -73,8 +76,8 @@ only between resolved actions and never from rendering, pause, or animations.
 An optional `boss_wave` requires `when` and `spawns`, with optional `escape_policy`.
 Its trigger is `after_scripted_waves_cleared`. Entries use the same four fields as
 ordinary spawns. Stage 1 `ultros`/`typhon` and Stage 2 `chichu` are live boss kinds.
-Each is restricted to its own stage. Stage 3 `odin` remains a structurally valid
-reservation rejected by live registration.
+Stage 3 `odin` is also live. Each boss kind is restricted to its own stage;
+unknown names remain invalid.
 Boss IDs share the encounter namespace and must all be mandatory. Boss cells must
 be distinct and the complete group must fit capacity. `escape_policy` accepts only
 `contact_and_fail`, also the compatibility default when omitted. Canonical Stage 1
@@ -108,15 +111,16 @@ Completion requires actual activation and every mandatory boss defeated. An empt
 ordinary battlefield never skips the boss group. Stage 1 bosses have 15 HP and attack for 5 each surviving phase. Chichu has
 30 HP and acts once each phase: apply three-turn Poison beyond three columns
 from the player lane (column 14), otherwise deal 15 sound damage. All bosses take
-normal combat damage and then follow standard movement/contact. Odin remains
-unimplemented and unavailable for live registration.
+normal combat damage and then follow standard movement/contact. Odin has 50 HP
+and repeats SLASH (40), SLASH (40), EXECUTE. EXECUTE is explicitly a forced
+knockout that bypasses Ward; Reraise may revive before Game Over.
 
 ## Stage lifecycle
 
 World accepts an explicit `stages` mapping of stage numbers to validated, playable
 `EncounterDefinition` records. The mapping must include Stage 1, keys must match
 definitions, and World copies it. No later-stage files are discovered or installed
-automatically. The application explicitly registers Stages 1 and 2; additional
+automatically. The application explicitly registers Stages 1, 2, and 3; additional
 small configurations remain isolated test fixtures.
 
 An authorized clear is issued by the shared turn resolver after a completed shot
@@ -124,8 +128,8 @@ or spell and before the enemy phase. `World.advance_stage()` requires that clear
 and a registered configuration for exactly the next stage. Missing configurations
 leave Stage Clear intact; they never create an empty battlefield. Enter can
 acknowledge a next stage when one is registered. The default Stage 1 clear allows
-Enter to Stage 2 Intro, then Enter starts its first wave. Stage 2 Clear waits for
-R because Stage 3 is not registered. The historical prototype, selected as a
+Enter to Stage 2 Intro, then Enter starts its first wave. Stage 2 Clear similarly
+advances to Stage 3 Intro. Stage 3 completes into Victory, then Enter opens Results. The historical prototype, selected as a
 single encounter, retains its original Stage Clear and restart behavior.
 
 Each stage starts a fresh encounter: HP/MP/BP become 100/100/1, the stage turn
@@ -135,8 +139,8 @@ wave scheduling reset. This fresh-clock and effect-reset policy is a project
 choice alongside the fixed resource reset. IDs are scoped to each encounter.
 The next stage's first wave appears when its introduction is acknowledged.
 
-Final Stage 3 completion enters Victory; Enter can continue to Results. These
-minimal states are exercised by fixtures only. R from Stage Clear, Game Over,
+Final Stage 3 completion enters Victory; Enter continues to Results. Both screens
+preserve terminal resources and turn information without calculating a score. R from Stage Clear, Game Over,
 Victory, or Results resets the complete run to its configured Stage 1.
 
 ## Stage 2 encounter decisions
@@ -153,3 +157,27 @@ the player, Bulb targets the current player row, and Chichu acts each surviving
 phase with three-turn Poison at long range. Enemy-phase refresh preserves an
 already-earned Poison/tile tick without stacking or shortening the new duration.
 First application retains its grace phase. No Stage 2 enemy applies Doom.
+
+## Stage 3 encounter decisions
+
+Seven waves use 5/5/5/6/6/6/6 ordinary enemies, with one crystal each. Trigger turns
+are 1/4/7/10/13/16/19, capacity is 25, and the primary rows are 3/2/4/1/5/2/3.
+Scripted IDs are 401–446; crystal IDs are 406/412/418/425/432/439/446. Odin is
+mandatory ID 500 at column 5, row 3. All 39 ordinary enemies are mandatory too.
+These placements and counts are this game's design, not an original-game wave table.
+
+Mandragora uses Bulb's player-row placement and two-phase tile rules. Diremite
+applies two-turn Poison every second surviving phase, retaining the earned-tick
+refresh correction. Tonberry becomes Enraged only after actual positive HP loss
+from the shared damage method, and retaliates for 3 in the next enemy phase it
+survives. Zero damage cannot trigger it. Gorgon refreshes one five-turn Doom record
+every second surviving phase; the refresh phase is grace. Once Gorgon stops
+refreshing it, Doom continues through five eligible phases to forced knockout.
+
+Odin uses the same atomic boss group, mandatory-outcome, movement, contact, and
+death systems as earlier bosses. Its recorded cycle index is 0/1/2 for the next
+SLASH/SLASH/EXECUTE and advances once per claimed surviving action. EXECUTE uses
+World's forced-knockout resolver instead of ordinary damage; Ward never blocks it,
+while Reraise restores 50 HP once. The next phase begins another SLASH cycle.
+No action occurs on spawn, while paused, after death, or after an authorized final
+clear. Restart discards both Enrage and cycle state with the old encounter.

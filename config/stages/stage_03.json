@@ -1,0 +1,375 @@
+{
+  "schema_version": 1,
+  "stage": 3,
+  "capacity": 25,
+  "waves": [
+    {
+      "turn": 1,
+      "spawns": [
+        {
+          "id": 401,
+          "kind": "bomb",
+          "col": 7,
+          "row": 3
+        },
+        {
+          "id": 402,
+          "kind": "mandragora",
+          "col": 6,
+          "row": 2
+        },
+        {
+          "id": 403,
+          "kind": "diremite",
+          "col": 5,
+          "row": 3
+        },
+        {
+          "id": 404,
+          "kind": "tonberry",
+          "col": 5,
+          "row": 4
+        },
+        {
+          "id": 405,
+          "kind": "gorgon",
+          "col": 6,
+          "row": 3
+        },
+        {
+          "id": 406,
+          "kind": "crystal",
+          "col": 9,
+          "row": 3
+        }
+      ]
+    },
+    {
+      "turn": 4,
+      "spawns": [
+        {
+          "id": 407,
+          "kind": "bomb",
+          "col": 7,
+          "row": 2
+        },
+        {
+          "id": 408,
+          "kind": "mandragora",
+          "col": 6,
+          "row": 1
+        },
+        {
+          "id": 409,
+          "kind": "diremite",
+          "col": 5,
+          "row": 2
+        },
+        {
+          "id": 410,
+          "kind": "tonberry",
+          "col": 5,
+          "row": 3
+        },
+        {
+          "id": 411,
+          "kind": "gorgon",
+          "col": 6,
+          "row": 2
+        },
+        {
+          "id": 412,
+          "kind": "crystal",
+          "col": 9,
+          "row": 2
+        }
+      ]
+    },
+    {
+      "turn": 7,
+      "spawns": [
+        {
+          "id": 413,
+          "kind": "bomb",
+          "col": 7,
+          "row": 4
+        },
+        {
+          "id": 414,
+          "kind": "mandragora",
+          "col": 6,
+          "row": 3
+        },
+        {
+          "id": 415,
+          "kind": "diremite",
+          "col": 5,
+          "row": 4
+        },
+        {
+          "id": 416,
+          "kind": "tonberry",
+          "col": 5,
+          "row": 5
+        },
+        {
+          "id": 417,
+          "kind": "gorgon",
+          "col": 6,
+          "row": 4
+        },
+        {
+          "id": 418,
+          "kind": "crystal",
+          "col": 9,
+          "row": 4
+        }
+      ]
+    },
+    {
+      "turn": 10,
+      "spawns": [
+        {
+          "id": 419,
+          "kind": "bomb",
+          "col": 7,
+          "row": 1
+        },
+        {
+          "id": 420,
+          "kind": "bomb",
+          "col": 6,
+          "row": 1
+        },
+        {
+          "id": 421,
+          "kind": "mandragora",
+          "col": 6,
+          "row": 0
+        },
+        {
+          "id": 422,
+          "kind": "diremite",
+          "col": 5,
+          "row": 1
+        },
+        {
+          "id": 423,
+          "kind": "tonberry",
+          "col": 5,
+          "row": 2
+        },
+        {
+          "id": 424,
+          "kind": "gorgon",
+          "col": 4,
+          "row": 1
+        },
+        {
+          "id": 425,
+          "kind": "crystal",
+          "col": 9,
+          "row": 1
+        }
+      ]
+    },
+    {
+      "turn": 13,
+      "spawns": [
+        {
+          "id": 426,
+          "kind": "bomb",
+          "col": 7,
+          "row": 5
+        },
+        {
+          "id": 427,
+          "kind": "bomb",
+          "col": 6,
+          "row": 5
+        },
+        {
+          "id": 428,
+          "kind": "mandragora",
+          "col": 6,
+          "row": 4
+        },
+        {
+          "id": 429,
+          "kind": "diremite",
+          "col": 5,
+          "row": 5
+        },
+        {
+          "id": 430,
+          "kind": "tonberry",
+          "col": 5,
+          "row": 6
+        },
+        {
+          "id": 431,
+          "kind": "gorgon",
+          "col": 4,
+          "row": 5
+        },
+        {
+          "id": 432,
+          "kind": "crystal",
+          "col": 9,
+          "row": 5
+        }
+      ]
+    },
+    {
+      "turn": 16,
+      "spawns": [
+        {
+          "id": 433,
+          "kind": "bomb",
+          "col": 7,
+          "row": 2
+        },
+        {
+          "id": 434,
+          "kind": "bomb",
+          "col": 6,
+          "row": 2
+        },
+        {
+          "id": 435,
+          "kind": "mandragora",
+          "col": 6,
+          "row": 1
+        },
+        {
+          "id": 436,
+          "kind": "diremite",
+          "col": 5,
+          "row": 2
+        },
+        {
+          "id": 437,
+          "kind": "tonberry",
+          "col": 5,
+          "row": 3
+        },
+        {
+          "id": 438,
+          "kind": "gorgon",
+          "col": 4,
+          "row": 2
+        },
+        {
+          "id": 439,
+          "kind": "crystal",
+          "col": 9,
+          "row": 2
+        }
+      ]
+    },
+    {
+      "turn": 19,
+      "spawns": [
+        {
+          "id": 440,
+          "kind": "bomb",
+          "col": 7,
+          "row": 3
+        },
+        {
+          "id": 441,
+          "kind": "bomb",
+          "col": 6,
+          "row": 3
+        },
+        {
+          "id": 442,
+          "kind": "mandragora",
+          "col": 6,
+          "row": 2
+        },
+        {
+          "id": 443,
+          "kind": "diremite",
+          "col": 5,
+          "row": 3
+        },
+        {
+          "id": 444,
+          "kind": "tonberry",
+          "col": 5,
+          "row": 4
+        },
+        {
+          "id": 445,
+          "kind": "gorgon",
+          "col": 4,
+          "row": 3
+        },
+        {
+          "id": 446,
+          "kind": "crystal",
+          "col": 9,
+          "row": 3
+        }
+      ]
+    }
+  ],
+  "boss_wave": {
+    "when": "after_scripted_waves_cleared",
+    "escape_policy": "contact_and_fail",
+    "spawns": [
+      {
+        "id": 500,
+        "kind": "odin",
+        "col": 5,
+        "row": 3
+      }
+    ]
+  },
+  "completion": {
+    "mandatory_enemy_ids": [
+      401,
+      402,
+      403,
+      404,
+      405,
+      407,
+      408,
+      409,
+      410,
+      411,
+      413,
+      414,
+      415,
+      416,
+      417,
+      419,
+      420,
+      421,
+      422,
+      423,
+      424,
+      426,
+      427,
+      428,
+      429,
+      430,
+      431,
+      433,
+      434,
+      435,
+      436,
+      437,
+      438,
+      440,
+      441,
+      442,
+      443,
+      444,
+      445,
+      500
+    ],
+    "final": true
+  }
+}
