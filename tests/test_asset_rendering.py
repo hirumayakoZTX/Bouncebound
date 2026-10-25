@@ -129,11 +129,13 @@ class AssetRenderingTests(unittest.TestCase):
             def render(self,text,*args):labels.append(text);return self.font.render(text,*args)
         renderer.hud_font=Font(renderer.hud_font);renderer.body_font=Font(renderer.body_font)
         # The real canonical first wave includes both provided enemy sprite kinds.
-        renderer.draw(self.screen,w.snapshot())
+        with patch.object(renderer.hud, '_text', wraps=renderer.hud._text) as hud_text:
+            renderer.draw(self.screen,w.snapshot())
+        labels.extend(call.args[1] for call in hud_text.call_args_list)
         self.assertIn('S5',labels);self.assertIn('B5',labels)
         self.assertIn('Cure requires missing HP',labels)
         self.assertTrue(any('HP 100/100' in text for text in labels))
-        self.assertTrue(any('MP 10' in text and 'Pom Cure' in text for text in labels))
+        self.assertIn('[4] Pom Cure',labels);self.assertIn('MP 10',labels)
 
     def test_snapshot_is_frozen_and_every_scene_with_assets_is_read_only(self):
         w=self.playing();w.apply_status(StatusKind.DOOM);w.place_poison_tile(3)
