@@ -6,12 +6,15 @@ from src.constants import BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE, WINDOW_TITLE
 from src.states import ACTIVE_STATES, GameState
 from src.world import WorldSnapshot
 from src.entities import EnemyType
+from src.player_actions import SPELL_ANIMATION_SECONDS, spell_failure_message
+from src.spells import get_spell
 
 
 class Renderer:
     def __init__(self) -> None:
         self.title_font = pygame.font.Font(None, 48)
         self.body_font = pygame.font.Font(None, 28)
+        self.hud_font = pygame.font.Font(None, 22)
 
     def draw(self, screen: pygame.Surface, snapshot: WorldSnapshot) -> None:
         screen.fill((21, 28, 44))
@@ -60,7 +63,13 @@ class Renderer:
         arena = pygame.Rect(BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE)
         pygame.draw.rect(screen, (30, 43, 63), arena)
         pygame.draw.rect(screen, (102, 139, 175), arena, width=2)
-        self._center_text(screen, "Green: Slime | Red: Bomb | Blue: BP Crystal", 56)
+        statuses = " | ".join(
+            effect.kind.name + (f" {effect.remaining_turns}" if effect.remaining_turns is not None
+                                else " (1 revival)")
+            for effect in snapshot.statuses
+        )
+        self._hud_text(screen, "Status: " + statuses if statuses else
+                       "Green: Slime | Red: Bomb | Blue: BP Crystal", 56)
         for enemy in snapshot.enemies:
             rect = pygame.Rect(enemy.bounds.left, enemy.bounds.top,
                                enemy.bounds.right - enemy.bounds.left,
@@ -102,6 +111,16 @@ class Renderer:
             self._center_text(screen, feedback + "Waiting for input", 472)
         elif snapshot.state is GameState.SHOT_ANIMATION:
             self._center_text(screen, "Orb in flight", 472)
+        elif (snapshot.state is GameState.SPELL_ANIMATION
+              or (snapshot.state is GameState.PAUSED
+                  and snapshot.paused_state is GameState.SPELL_ANIMATION)):
+            result = snapshot.spell_result
+            if result is not None:
+                name = get_spell(result.cast.spell_id).name
+                progress = 1.0 - snapshot.spell_remaining / SPELL_ANIMATION_SECONDS
+                pygame.draw.circle(screen, (201, 158, 255), snapshot.player_position,
+                                   24 + int(12 * progress), width=2)
+                self._center_text(screen, f"{name} | Spell effect", 472)
         elif snapshot.state is GameState.TURN_RESOLVE:
             self._center_text(screen, "Resolving enemy phase", 472)
         self._center_text(
@@ -109,10 +128,27 @@ class Renderer:
             f"HP {snapshot.hp}/{snapshot.max_hp}    "
             f"MP {snapshot.mp}/{snapshot.max_mp}    BP {snapshot.bp}"
             + (f" (+{snapshot.pending_bp} pending)" if snapshot.pending_bp else ""),
-            500,
+            495,
         )
-        if snapshot.state is not GameState.PAUSED:
-            self._center_text(screen, f"{snapshot.state.name} | Escape: Pause", 540)
+        hud = snapshot.spell_hud
+        if hud is None:
+            selection = "Spell: None | Select with 1-8"
+        else:
+            readiness = "Ready" if hud.ready else spell_failure_message(hud.failure)
+            selection = (f"{hud.definition.name} | MP {hud.definition.mp_cost} | "
+                         f"Ready turn {hud.next_ready_turn} | {readiness}")
+        self._hud_text(screen, selection, 518)
+        self._hud_text(screen, snapshot.spell_feedback or snapshot.state.name, 540)
+        self._hud_text(screen, "1 Fire  2 Starstorm  3 Meteor  4 Cure  5 Esuna  6 Levitation  7 Ward  8 Reraise"
+                       "  | Space: Cast | Click: Shoot | Esc: Pause", 563)
+
+    def _hud_text(self, screen: pygame.Surface, text: str, y: int) -> None:
+        image = self.hud_font.render(text, True, (235, 239, 250))
+        if image.get_width() > screen.get_width() - 24:
+            # Fit long status/control lists into their HUD row without covering the arena.
+            image = pygame.transform.smoothscale(
+                image, (screen.get_width() - 24, image.get_height()))
+        screen.blit(image, image.get_rect(center=(screen.get_width() // 2, y)))
 
     def _center_text(
         self, screen: pygame.Surface, text: str, y: int, *, heading: bool = False
