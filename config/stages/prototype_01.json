@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "stage": 1,
+  "waves": [
+    {
+      "turn": 1,
+      "spawns": [
+        {
+          "id": 1,
+          "kind": "basic",
+          "col": 2,
+          "row": 3
+        },
+        {
+          "id": 2,
+          "kind": "bomb",
+          "col": 3,
+          "row": 3
+        },
+        {
+          "id": 3,
+          "kind": "bomb",
+          "col": 4,
+          "row": 3
+        },
+        {
+          "id": 4,
+          "kind": "basic",
+          "col": 2,
+          "row": 4
+        },
+        {
+          "id": 5,
+          "kind": "basic",
+          "col": 3,
+          "row": 4
+        },
+        {
+          "id": 6,
+          "kind": "basic",
+          "col": 4,
+          "row": 4
+        },
+        {
+          "id": 7,
+          "kind": "crystal",
+          "col": 10,
+          "row": 3
+        }
+      ]
+    },
+    {
+      "turn": 3,
+      "spawns": [
+        {
+          "id": 8,
+          "kind": "basic",
+          "col": 2,
+          "row": 2
+        },
+        {
+          "id": 9,
+          "kind": "bomb",
+          "col": 3,
+          "row": 2
+        },
+        {
+          "id": 10,
+          "kind": "bomb",
+          "col": 4,
+          "row": 2
+        },
+        {
+          "id": 11,
+          "kind": "basic",
+          "col": 2,
+          "row": 3
+        },
+        {
+          "id": 12,
+          "kind": "basic",
+          "col": 3,
+          "row": 3
+        },
+        {
+          "id": 13,
+          "kind": "basic",
+          "col": 4,
+          "row": 3
+        },
+        {
+          "id": 14,
+          "kind": "crystal",
+          "col": 9,
+          "row": 2
+        }
+      ]
+    },
+    {
+      "turn": 5,
+      "spawns": [
+        {
+          "id": 15,
+          "kind": "basic",
+          "col": 2,
+          "row": 4
+        },
+        {
+          "id": 16,
+          "kind": "bomb",
+          "col": 3,
+          "row": 4
+        },
+        {
+          "id": 17,
+          "kind": "bomb",
+          "col": 4,
+          "row": 4
+        },
+        {
+          "id": 18,
+          "kind": "basic",
+          "col": 2,
+          "row": 5
+        },
+        {
+          "id": 19,
+          "kind": "basic",
+          "col": 3,
+          "row": 5
+        },
+        {
+          "id": 20,
+          "kind": "basic",
+          "col": 4,
+          "row": 5
+        },
+        {
+          "id": 21,
+          "kind": "crystal",
+          "col": 8,
+          "row": 4
+        }
+      ]
+    },
+    {
+      "turn": 7,
+      "spawns": [
+        {
+          "id": 22,
+          "kind": "basic",
+          "col": 2,
+          "row": 3
+        },
+        {
+          "id": 23,
+          "kind": "bomb",
+          "col": 3,
+          "row": 3
+        },
+        {
+          "id": 24,
+          "kind": "bomb",
+          "col": 4,
+          "row": 3
+        },
+        {
+          "id": 25,
+          "kind": "basic",
+          "col": 2,
+          "row": 4
+        },
+        {
+          "id": 26,
+          "kind": "basic",
+          "col": 3,
+          "row": 4
+        },
+        {
+          "id": 27,
+          "kind": "basic",
+          "col": 4,
+          "row": 4
+        },
+        {
+          "id": 28,
+          "kind": "crystal",
+          "col": 11,
+          "row": 3
+        }
+      ]
+    }
+  ],
+  "completion": {
+    "mandatory_enemy_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27
+    ],
+    "final": false
+  }
+}

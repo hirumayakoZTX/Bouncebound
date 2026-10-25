@@ -168,14 +168,19 @@ class StatusState:
         self._phase_turn = turn
         return True
 
-    def take_poison_tick(self, turn: int) -> StatusEffect | None:
+    def take_poison_tick(self, turn: int, initial: StatusEffect | None = None) -> StatusEffect | None:
         """Claim one tick; the application phase is grace, without damage or aging."""
         validate_turn(turn)
         if turn <= self._poison_turn:
             return None
         self._poison_turn = turn
         effect = self.get(StatusKind.POISON)
-        return effect if effect is not None and turn > effect.applied_turn else None
+        # Refresh during an enemy ability cannot erase a tick already earned at
+        # phase start. A first application still receives its full grace phase.
+        eligible = (effect is not None and (turn > effect.applied_turn or
+                    initial is not None and initial.kind is StatusKind.POISON
+                    and turn > initial.applied_turn))
+        return effect if eligible else None
 
     def advance_doom(self, turn: int) -> bool:
         """Advance once and remove consumed Doom before reporting its knockout."""

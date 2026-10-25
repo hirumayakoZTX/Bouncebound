@@ -13,12 +13,19 @@ import pygame
 
 from src.constants import LOGICAL_SIZE
 from src.game import Game
+from prototype_fixtures import prototype_game
 from src.renderer import Renderer
 from src.states import GameState
 from src.world import World
+from config.prototype import PROTOTYPE
 
 
 def world_in_state(state: GameState) -> World:
+    # Explicit terminal UI fixtures; stage authorization is tested through real encounters.
+    if state in (GameState.STAGE_CLEAR, GameState.VICTORY, GameState.RESULTS):
+        world = World(encounter=PROTOTYPE)
+        world._state = state
+        return world
     paths = {
         GameState.MENU: (),
         GameState.STAGE_INTRO: (GameState.STAGE_INTRO,),
@@ -45,7 +52,7 @@ def world_in_state(state: GameState) -> World:
         ),
         GameState.PAUSED: aim_path + (GameState.PAUSED,),
     })
-    world = World()
+    world = World(encounter=PROTOTYPE)
     for target in paths[state]:
         if not world.transition_to(target):
             raise AssertionError(f"Could not reach {target.name}")
@@ -57,7 +64,7 @@ class SceneTests(unittest.TestCase):
         pygame.quit()
 
     def game_in_state(self, state: GameState) -> Game:
-        game = Game()
+        game = prototype_game()
         game.world = world_in_state(state)
         game.running = True
         return game
@@ -107,7 +114,8 @@ class SceneTests(unittest.TestCase):
                 game = self.game_in_state(state)
                 before = deepcopy(vars(game.world))
                 keys = (pygame.K_SPACE, pygame.K_1) if state is not GameState.PLAYER_AIM else ()
-                if state not in (GameState.GAME_OVER, GameState.STAGE_CLEAR):
+                if state not in (GameState.GAME_OVER, GameState.STAGE_CLEAR,
+                                 GameState.VICTORY, GameState.RESULTS):
                     keys += (pygame.K_r,)
                 for key in keys:
                     game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
@@ -195,7 +203,7 @@ class SceneTests(unittest.TestCase):
             line.assert_not_called()
 
     def test_event_loop_navigation_keeps_turn_and_frame_cap(self) -> None:
-        game = Game()
+        game = prototype_game()
         enter = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)
         escape = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE)
         events = [[enter], [enter], [escape], [enter], [escape],

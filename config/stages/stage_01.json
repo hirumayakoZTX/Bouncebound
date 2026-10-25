@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "stage": 1,
+  "waves": [
+    {
+      "turn": 1,
+      "spawns": [
+        {
+          "id": 1,
+          "kind": "basic",
+          "col": 1,
+          "row": 3
+        },
+        {
+          "id": 2,
+          "kind": "bomb",
+          "col": 2,
+          "row": 3
+        },
+        {
+          "id": 3,
+          "kind": "basic",
+          "col": 1,
+          "row": 4
+        },
+        {
+          "id": 4,
+          "kind": "basic",
+          "col": 2,
+          "row": 4
+        },
+        {
+          "id": 5,
+          "kind": "crystal",
+          "col": 9,
+          "row": 3
+        }
+      ]
+    },
+    {
+      "turn": 3,
+      "spawns": [
+        {
+          "id": 6,
+          "kind": "basic",
+          "col": 1,
+          "row": 2
+        },
+        {
+          "id": 7,
+          "kind": "bomb",
+          "col": 2,
+          "row": 2
+        },
+        {
+          "id": 8,
+          "kind": "bomb",
+          "col": 3,
+          "row": 2
+        },
+        {
+          "id": 9,
+          "kind": "basic",
+          "col": 1,
+          "row": 3
+        },
+        {
+          "id": 10,
+          "kind": "basic",
+          "col": 2,
+          "row": 3
+        },
+        {
+          "id": 11,
+          "kind": "crystal",
+          "col": 9,
+          "row": 2
+        }
+      ]
+    },
+    {
+      "turn": 5,
+      "spawns": [
+        {
+          "id": 12,
+          "kind": "basic",
+          "col": 2,
+          "row": 4
+        },
+        {
+          "id": 13,
+          "kind": "bomb",
+          "col": 3,
+          "row": 4
+        },
+        {
+          "id": 14,
+          "kind": "bomb",
+          "col": 4,
+          "row": 4
+        },
+        {
+          "id": 15,
+          "kind": "basic",
+          "col": 2,
+          "row": 5
+        },
+        {
+          "id": 16,
+          "kind": "basic",
+          "col": 3,
+          "row": 5
+        },
+        {
+          "id": 17,
+          "kind": "basic",
+          "col": 4,
+          "row": 5
+        },
+        {
+          "id": 18,
+          "kind": "crystal",
+          "col": 8,
+          "row": 4
+        }
+      ]
+    },
+    {
+      "turn": 7,
+      "spawns": [
+        {
+          "id": 19,
+          "kind": "basic",
+          "col": 2,
+          "row": 1
+        },
+        {
+          "id": 20,
+          "kind": "bomb",
+          "col": 3,
+          "row": 1
+        },
+        {
+          "id": 21,
+          "kind": "bomb",
+          "col": 4,
+          "row": 1
+        },
+        {
+          "id": 22,
+          "kind": "basic",
+          "col": 2,
+          "row": 2
+        },
+        {
+          "id": 23,
+          "kind": "basic",
+          "col": 3,
+          "row": 2
+        },
+        {
+          "id": 24,
+          "kind": "basic",
+          "col": 4,
+          "row": 2
+        },
+        {
+          "id": 25,
+          "kind": "crystal",
+          "col": 10,
+          "row": 1
+        }
+      ]
+    },
+    {
+      "turn": 9,
+      "spawns": [
+        {
+          "id": 26,
+          "kind": "basic",
+          "col": 2,
+          "row": 5
+        },
+        {
+          "id": 27,
+          "kind": "bomb",
+          "col": 3,
+          "row": 5
+        },
+        {
+          "id": 28,
+          "kind": "bomb",
+          "col": 4,
+          "row": 5
+        },
+        {
+          "id": 29,
+          "kind": "basic",
+          "col": 2,
+          "row": 6
+        },
+        {
+          "id": 30,
+          "kind": "basic",
+          "col": 3,
+          "row": 6
+        },
+        {
+          "id": 31,
+          "kind": "basic",
+          "col": 4,
+          "row": 6
+        },
+        {
+          "id": 32,
+          "kind": "basic",
+          "col": 4,
+          "row": 4
+        },
+        {
+          "id": 33,
+          "kind": "crystal",
+          "col": 9,
+          "row": 5
+        }
+      ]
+    }
+  ],
+  "capacity": 25,
+  "boss_wave": {
+    "when": "after_scripted_waves_cleared",
+    "escape_policy": "contact_and_fail",
+    "spawns": [
+      {
+        "id": 100,
+        "kind": "ultros",
+        "col": 7,
+        "row": 2
+      },
+      {
+        "id": 101,
+        "kind": "typhon",
+        "col": 7,
+        "row": 5
+      }
+    ]
+  },
+  "completion": {
+    "mandatory_enemy_ids": [
+      1,
+      2,
+      3,
+      4,
+      6,
+      7,
+      8,
+      9,
+      10,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      100,
+      101
+    ],
+    "final": false
+  }
+}

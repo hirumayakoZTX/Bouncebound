@@ -1,9 +1,10 @@
 """Run data and validated scene transitions without rendering dependencies."""
 
 from dataclasses import dataclass, replace
+from collections.abc import Mapping
+from types import MappingProxyType
 from math import isfinite
 
-from config.prototype import PROTOTYPE
 from src.constants import (
     AIM_ORIGIN_OFFSET, BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE,
     GRID_ROWS, INITIAL_PLAYER_ROW, PLAYER_X, TILE_SIZE,
@@ -19,6 +20,7 @@ from src.entities import (
     Crystal, CrystalSnapshot, Enemy, EnemySnapshot, EnemyTurnContext, validate_damage,
 )
 from src.turns import resolve_enemy_phase
+from src.stage_config import load_stage, validate_stage_registry
 from src.spells import (
     SpellContext, SpellEngine, SpellFailure, SpellId, SpellResult, StatusCheck, get_spell,
 )
@@ -30,6 +32,11 @@ from src.support_spells import SupportSpellResult, execute_support
 from src.player_actions import (
     ActionKind, MainAction, SpellHUD, SPELL_ANIMATION_SECONDS, spell_failure_message,
 )
+
+
+STAGE_ONE = load_stage("stage_01.json")
+STAGE_TWO = load_stage("stage_02.json")
+STAGE_THREE = load_stage("stage_03.json")
 
 
 # Action eligibility is checked by the controller before requesting scene edges.
@@ -91,18 +98,29 @@ class WorldSnapshot:
     pending_action: MainAction | None = None
     spell_remaining: float = 0.0
     spell_result: OffensiveSpellResult | SupportSpellResult | None = None
+    next_stage_available: bool = False
+    has_boss_wave: bool = False
+    boss_wave_spawned: bool = False
+    bosses_remaining: int = 0
+    boss_total: int = 0
 
 
 class World:
     def __init__(self, *, demo: bool | None = None,
-                 encounter: EncounterDefinition | None = None) -> None:
+                 encounter: EncounterDefinition | None = None,
+                 stages: Mapping[int, EncounterDefinition] | None = None) -> None:
         # Explicit demo modes retain the small regression fixtures used by earlier systems.
         if demo is not None and (type(demo) is not bool or encounter is not None):
             raise ValueError("Choose either a demo fixture or an encounter definition")
         if encounter is not None and not isinstance(encounter, EncounterDefinition):
             raise ValueError("Encounter configuration must be an EncounterDefinition")
+        if stages is not None and (demo is not None or encounter is not None):
+            raise ValueError("Choose a stage registry, a single encounter, or a demo fixture")
+        definitions = (stages if stages is not None else {1: encounter} if encounter is not None
+                       else {1: STAGE_ONE, 2: STAGE_TWO, 3: STAGE_THREE})
+        self._stage_definitions = validate_stage_registry(definitions)
         self._demo = demo
-        self._encounter_definition = (encounter or PROTOTYPE) if demo is None else None
+        self._encounter_definition = self._stage_definitions[1] if demo is None else None
         self.reset()
 
     @property
@@ -164,6 +182,7 @@ class World:
         self.last_spell_result: OffensiveSpellResult | SupportSpellResult | None = None
         self.last_resolved_turn: int | None = None
         self.game_over_reason: GameOverReason | None = None
+        self._cleared_stage: int | None = None
 
     @property
     def _pending_turn(self) -> int | None:
@@ -215,12 +234,39 @@ class World:
         self.transition_to(GameState.SPELL_ANIMATION)
         return result.commit
 
+    @property
+    def stage_definitions(self) -> Mapping[int, EncounterDefinition]:
+        return MappingProxyType(self._stage_definitions.copy())
+
+    @property
+    def can_advance_stage(self) -> bool:
+        return (self.state is GameState.STAGE_CLEAR and self._cleared_stage == self.stage
+                and self.encounter is not None and not self.encounter.definition.final
+                and self.stage + 1 in self._stage_definitions
+                and self._pending_action is None and not self.projectiles)
+
+    def advance_stage(self) -> bool:
+        """Enter a registered next encounter after an authorized clear.
+
+        Each stage starts a fresh encounter clock and clears cooldowns, effects,
+        Reraise allowance, histories, and identifiers along with HP/MP/BP reset.
+        The default application registers all three canonical encounters.
+        """
+        if not self.can_advance_stage:
+            return False
+        definition = self._stage_definitions[self.stage + 1]
+        self.reset()
+        self.stage = definition.stage
+        self.encounter = Encounter(definition)
+        return self.transition_to(GameState.STAGE_INTRO)
+
     def start_new_run(self) -> None:
         self.reset()
         self.transition_to(GameState.STAGE_INTRO)
 
     def restart(self) -> bool:
-        if self.state not in (GameState.GAME_OVER, GameState.STAGE_CLEAR):
+        if self.state not in (GameState.GAME_OVER, GameState.STAGE_CLEAR,
+                              GameState.VICTORY, GameState.RESULTS):
             return False
         self.start_new_run()
         return True
@@ -228,10 +274,20 @@ class World:
     def transition_to(self, target: GameState) -> bool:
         """Reject invalid edges without changing scene, pause data, or resources.
 
-        This validates scene order only. Future systems must validate action and
-        stage-end conditions before requesting a transition. No turn advances here.
+        Phase edges alone never authorize actions. Stage-end edges additionally
+        require a completion claim issued by the canonical turn resolver.
         """
         if not isinstance(target, GameState):
+            return False
+        if self.state is GameState.STAGE_CLEAR and target is GameState.STAGE_INTRO:
+            return self.advance_stage()
+        if target in (GameState.STAGE_CLEAR, GameState.VICTORY):
+            if self._cleared_stage != self.stage or self.encounter is None:
+                return False
+            expected = GameState.VICTORY if self.encounter.definition.final else GameState.STAGE_CLEAR
+            if target is not expected:
+                return False
+        if target is GameState.RESULTS and self._cleared_stage != self.stage:
             return False
         if self.state is GameState.PAUSED:
             if target is not self.paused_state:
@@ -254,6 +310,7 @@ class World:
         """Spawn only between actions; scheduled entries retry at later boundaries."""
         if (self.encounter is None
                 or self.state not in (GameState.PLAYER_AIM, GameState.TURN_RESOLVE)
+                or self._pending_action is not None
                 or any(orb.active for orb in self.projectiles)):
             return ()
         return self.encounter.spawn_due(self.turn_index, self.combat)
@@ -457,11 +514,11 @@ class World:
         self.transition_to(GameState.GAME_OVER)
 
     def check_stage_end(self) -> bool:
-        """A prototype clears only after the final action and all required defeats."""
+        """A stage clears only after the final action and all required defeats."""
         return (self.state is GameState.TURN_RESOLVE
                 and not any(orb.active for orb in self.projectiles)
                 and not self.combat.pending_deaths and self.pending_bp == 0
-                and self.encounter is not None
+                and self.encounter is not None and self.stage == self.encounter.definition.stage
                 and self.encounter.outcome(self.combat) is EncounterOutcome.CLEARED)
 
     def resolve_turn(self) -> bool:
@@ -479,16 +536,27 @@ class World:
         # Claim the action before invoking hooks, preventing repeated/reentrant phases.
         self._pending_action = None
         if self.check_stage_end():
-            self.transition_to(GameState.STAGE_CLEAR)
+            self._cleared_stage = self.stage
+            self.transition_to(GameState.VICTORY if self.encounter.definition.final
+                               else GameState.STAGE_CLEAR)
             return True
         initial_statuses = self.statuses.snapshot()
+        initial_hazards = self.hazards.snapshot()
         context = EnemyTurnContext(
             turn_index=self.turn_index,
             damage_player=lambda amount: self.apply_player_damage(amount, source="enemy_contact"),
+            attack_player=lambda amount: self.apply_player_damage(amount, source="boss_attack"),
             player_defeated=lambda: self.hp <= 0 or self.state is GameState.GAME_OVER,
+            force_knockout=lambda: self.force_player_knockout(source="odin_execute"),
+            player_row=self.player_row,
+            ability_player=lambda amount: self.apply_player_damage(amount, source="enemy_ability"),
+            apply_status=lambda kind, duration, source: self.apply_status(
+                kind, duration, source_id=source),
+            place_poison_tile=lambda row, duration, source: self.place_poison_tile(
+                row, duration, source_id=source),
         )
         resolve_enemy_phase(self.enemies.values(), context)
-        process_status_phase(self, initial_statuses)
+        process_status_phase(self, initial_statuses, initial_hazards)
         self.last_resolved_turn = self.turn_index
         if self.hp <= 0 or self.state is GameState.GAME_OVER:
             if self.state is not GameState.GAME_OVER:
@@ -545,4 +613,10 @@ class World:
             pending_action=self._pending_action,
             spell_remaining=self._spell_remaining,
             spell_result=self.last_spell_result,
+            next_stage_available=self.can_advance_stage,
+            has_boss_wave=self.encounter is not None and self.encounter.definition.boss_wave is not None,
+            boss_wave_spawned=self.encounter.boss_wave_spawned if self.encounter else False,
+            bosses_remaining=sum(enemy.active and enemy.is_boss for enemy in self.enemies.values()),
+            boss_total=(len(self.encounter.definition.boss_wave.spawns)
+                        if self.encounter and self.encounter.definition.boss_wave else 0),
         )

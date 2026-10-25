@@ -51,12 +51,17 @@ class HazardState:
     def snapshot(self) -> tuple[PoisonTile, ...]:
         return tuple(self._tiles[row] for row in sorted(self._tiles))
 
-    def begin_phase(self, turn: int) -> tuple[PoisonTile, ...]:
+    def begin_phase(self, turn: int, initial: tuple[PoisonTile, ...] = ()) -> tuple[PoisonTile, ...]:
         validate_turn(turn)
         if turn <= self._phase_turn:
             return ()
         self._phase_turn = turn
-        return tuple(tile for tile in self.snapshot() if tile.applied_turn < turn)
+        # A mid-phase refresh preserves an already-earned hit. Return the old
+        # eligible record so finish_phase leaves the refreshed duration intact.
+        due = {tile.row: tile for tile in initial if tile.applied_turn < turn
+               and tile.row in self._tiles}
+        due.update({tile.row: tile for tile in self.snapshot() if tile.applied_turn < turn})
+        return tuple(due[row] for row in sorted(due))
 
     def finish_phase(self, turn: int, initial: tuple[PoisonTile, ...]) -> tuple[StatusEvent, ...]:
         validate_turn(turn)
