@@ -1,6 +1,7 @@
 """One deterministic enemy phase, independent of physics and rendering."""
 
 from collections.abc import Iterable
+from dataclasses import replace
 
 from src.constants import GRID_COLUMNS
 from src.entities import Enemy, EnemyTurnContext
@@ -13,6 +14,9 @@ def resolve_enemy_phase(enemies: Iterable[Enemy], context: EnemyTurnContext) -> 
     vacated by an earlier ID is available immediately. Crystals do not block.
     """
     ordered = tuple(sorted(enemies, key=lambda enemy: enemy.enemy_id))
+    context = replace(context, cell_is_free=lambda col, row: not any(
+        other.active and (other.grid_col, other.grid_row) == (col, row) for other in ordered
+    ))
     for enemy in ordered:
         if context.player_defeated():
             break

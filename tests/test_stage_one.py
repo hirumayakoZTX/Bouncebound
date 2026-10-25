@@ -45,7 +45,7 @@ class CanonicalStageOneTests(unittest.TestCase):
                          [(100,'ultros',7,2),(101,'typhon',7,5)])
         self.assertEqual(len(STAGE_ONE.mandatory_ids), 30)
         self.assertTrue({100, 101} <= set(STAGE_ONE.mandatory_ids))
-        self.assertEqual(dict(World().stage_definitions), {1: STAGE_ONE})
+        self.assertEqual(dict(World(encounter=STAGE_ONE).stage_definitions), {1: STAGE_ONE})
         self.assertFalse(STAGE_ONE.final)
 
     def test_bosses_activate_after_final_scripted_action_and_never_during_its_animation(self):
@@ -263,7 +263,7 @@ class CanonicalStageOneTests(unittest.TestCase):
 
     def test_posted_game_events_complete_canonical_boss_encounter(self):
         pygame.display.init()
-        game = Game();game.running = True
+        game = Game();game.world = World(encounter=STAGE_ONE);game.running = True
         for key in (pygame.K_RETURN,pygame.K_RETURN):
             pygame.event.post(pygame.event.Event(pygame.KEYDOWN,key=key))
         for event in pygame.event.get():game.handle_event(event)

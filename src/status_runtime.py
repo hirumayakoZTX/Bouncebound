@@ -7,7 +7,7 @@ Knockouts/revival are resolved atomically by World at each actual damage event.
 
 from typing import Protocol
 
-from src.hazards import HazardState, POISON_TILE_DAMAGE
+from src.hazards import HazardState, PoisonTile, POISON_TILE_DAMAGE
 from src.states import GameState
 from src.statuses import (
     POISON_DAMAGE, StatusEffect, StatusEvent, StatusEventKind, StatusKind, StatusState,
@@ -28,13 +28,14 @@ class StatusOwner(Protocol):
     def force_player_knockout(self, *, source: str = "doom") -> int: ...
 
 
-def process_status_phase(owner: StatusOwner, initial: tuple[StatusEffect, ...]) -> tuple[StatusEvent, ...]:
+def process_status_phase(owner: StatusOwner, initial: tuple[StatusEffect, ...],
+                         initial_hazards: tuple[PoisonTile, ...] = ()) -> tuple[StatusEvent, ...]:
     turn = owner.turn_index
     if (owner.state is not GameState.TURN_RESOLVE or owner.hp <= 0
             or not owner.statuses.begin_phase(turn)):
         return ()
     index = len(owner.statuses.events)
-    tiles = owner.hazards.begin_phase(turn)
+    tiles = owner.hazards.begin_phase(turn, initial_hazards)
     for tile in tiles:
         if owner.hp <= 0:
             break
@@ -47,7 +48,8 @@ def process_status_phase(owner: StatusOwner, initial: tuple[StatusEffect, ...]) 
                                               hp_before=owner.hp, hp_after=owner.hp))
         else:
             owner.apply_player_damage(POISON_TILE_DAMAGE, source="poison_tile", row=tile.row)
-    if owner.hp > 0 and owner.statuses.take_poison_tick(turn) is not None:
+    initial_poison = next((effect for effect in initial if effect.kind is StatusKind.POISON), None)
+    if owner.hp > 0 and owner.statuses.take_poison_tick(turn, initial_poison) is not None:
         owner.apply_player_damage(POISON_DAMAGE, source="poison")
     if owner.hp > 0 and owner.statuses.advance_doom(turn):
         owner.force_player_knockout(source="doom")

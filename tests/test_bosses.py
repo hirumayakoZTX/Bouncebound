@@ -200,7 +200,7 @@ class BossSchedulerTests(unittest.TestCase):
     def test_live_stage_one_boss_kinds_register_but_future_bosses_remain_reserved(self):
         self.assertTrue(self.definition.playable)
         self.assertIsNotNone(World(encounter=self.definition))
-        for stage, kind in ((2, 'chichu'), (3, 'odin')):
+        for stage, kind in ((3, 'odin'),):
             data = stage_data(stage)
             data['boss_wave'] = {'when': 'after_scripted_waves_cleared', 'spawns': [
                 {'id': 100, 'kind': kind, 'col': 0, 'row': 3}]}

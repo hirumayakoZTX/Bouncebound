@@ -44,7 +44,7 @@ def _spawn(value: object, location: str, *, boss: bool = False) -> Spawn | BossS
 
 
 def parse_stage(data: object) -> EncounterDefinition:
-    """Validate decoded JSON, including live Stage 1 and reserved future boss metadata."""
+    """Validate decoded JSON, including supported enemies and reserved future boss metadata."""
     root = _object(data, {"schema_version", "stage", "waves", "completion"},
                    {"capacity", "boss_wave"}, "stage")
     if type(root["schema_version"]) is not int or root["schema_version"] != 1:

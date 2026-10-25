@@ -2,9 +2,9 @@
 
 An original, offline, turn-driven ricochet defense game inspired by Kupo Kupo
 Adventure. The current version provides a main menu, stage introduction,
-a complete five-wave Stage 1 with vertical movement, mouse aiming, ricocheting
-orbs, Basic Slimes, Bomb chain reactions, BP crystals, enemy turns, player damage,
-Ultros and Typhon, stage clear, defeat, restart, pause/resume, and turn-based spells.
+two complete playable stages with vertical movement, mouse aiming, ricocheting
+orbs, Bomb chain reactions, BP crystals, enemy abilities, statuses, floor hazards,
+Ultros, Typhon, Chichu, stage progression, defeat, restart, pause/resume, and spells.
 
 ## Requirements
 
@@ -63,19 +63,22 @@ Audio hardware is not initialized or required.
 - **Escape** at the battlefield pauses; press it again to resume.
 - **Escape** at the menu exits. The window close button exits from any screen.
 - **R** at Stage Clear or Game Over restarts the entire run at the introduction.
-  Restart is disabled during active gameplay. Enter does not leave Stage Clear.
+  Restart is disabled during active gameplay. **Enter** after Stage 1 Clear opens
+  Stage 2 Intro; Enter again starts Stage 2. Stage 2 Clear waits for restart.
 
 New runs begin at Stage 1, Turn 1, with HP 100/100, MP 100/100, and BP 1.
 HP tracks player health; MP pays spell costs and does not regenerate passively.
-BP controls the number of orbs per shot. Only Stage 1 is currently playable.
-Fire, Starstorm, Cure, Ward, and Reraise are unlocked. Esuna and Levitation require
-Stage 2; Meteor requires Stage 3, which are not playable yet.
+BP controls the number of orbs per shot. Stages 1 and 2 are playable.
+Fire, Starstorm, Cure, Ward, and Reraise unlock in Stage 1. Stage 2 additionally
+unlocks Esuna and Levitation. Meteor requires Stage 3, which is not playable.
 
-| Key | Stage 1 spell | MP | Cooldown | Effect |
+| Key | Spell | MP | Cooldown | Effect |
 |---|---|---:|---:|---|
 | 1 | Pom Fire | 30 | 3 | 20 damage to the nearest enemy in the player's row |
 | 2 | Pom Starstorm | 40 | 4 | 10 damage in a radius-96 area centered eight cells left |
 | 4 | Pom Cure | 10 | 1 | Restore up to 50 HP; requires missing HP |
+| 5 | Pom Esuna (Stage 2) | 20 | 3 | Remove Poison and Bind; preserve Doom and beneficial effects |
+| 6 | Pom Levitation (Stage 2) | 20 | 3 | Ignore floor damage during the cast's enemy phase |
 | 7 | Pom Ward | 30 | 3 | Negate one ordinary damage event during the cast's enemy phase |
 | 8 | Pom Reraise | 50 | 99 | Next knockout restores 50 HP; cast once per encounter |
 
@@ -109,7 +112,8 @@ count cost. Each crystal queues +1 BP once, applied only after the entire shot
 finishes, up to BP 5. New BP affects the next shot, never the orbs already flying.
 
 Stage 1 loads `config/stages/stage_01.json`. The [stage configuration format](config/stages/README.md)
-documents validation and scheduling. Only Stage 1 is installed. The historical
+documents validation and scheduling. Stage 2 loads `config/stages/stage_02.json`.
+Both encounters are registered by the application. The historical
 `prototype_01.json` remains available for regression fixtures and is not the
 application's default encounter.
 
@@ -174,8 +178,56 @@ successful clear.
 The end screen shows stage, turn, HP, MP, and BP. Press R to reset resources,
 position, aiming, projectiles, spell history, statuses, hazards, enemies, crystals,
 boss activation, IDs, and all wave history, then Enter to play again. R is disabled
-during active turns. Stage Clear does not advance into an unfinished Stage 2.
-There are no playable Stage 2 or Stage 3 encounters.
+during active turns. Enter after Stage 1 Clear opens Stage 2 Intro, then Enter
+starts its first wave. Stage 2 Clear never enters the unfinished Stage 3.
+
+Each stage starts a fresh encounter: HP/MP/BP reset to 100/100/1, Turn returns to
+1, and the player returns to row 3 with no aim. Cooldowns, spell selection and
+committed action IDs, Reraise allowance, statuses, hazards, projectiles, animations,
+enemy/crystal archives, pending actions, and wave/boss histories all reset.
+Restart from either stage's end screen always returns to a fresh Stage 1.
+
+### Stage 2
+
+Six waves arrive on Turns **1, 4, 7, 10, 13, 16**, containing **4, 4, 5, 5, 5, 6**
+ordinary enemies and one crystal each. All 29 ordinary enemies and Chichu are
+mandatory. Bombs support chains against the tougher enemies; there are no
+substitute Slimes in this encounter. Capacity remains 25 active enemies.
+
+| Enemy / label | HP | Ability before forward movement |
+|---|---:|---|
+| Cactuar / C | 10 | Step one free row toward the player; deal 5 if then aligned |
+| Alligator / A | 12 | Deal 4 on every third surviving enemy phase |
+| Bulb / Bu | 8 | Every third surviving phase, place a two-phase PoisonTile on the player's row |
+| Morbol / M | 18 | Every third surviving phase, apply Bind 1 and Poison 3 |
+| Landtrap / L | 8 | Advance without an active attack |
+| Chichu / Ch | 30 | Each phase: Poison 3 beyond three columns; otherwise 15 direct damage |
+
+Each enemy advances at most one column after its ability, respecting occupied
+cells. Vertical Cactuar moves obey the same occupancy rule and wait when blocked.
+Ability cadence starts on each enemy's first surviving phase, not the global
+stage turn. Chichu measures distance to the player lane at column 14: columns
+0–10 use Poison; columns 11–13 use sound damage. All types retain 5 contact damage
+on escape. Bosses and ordinary enemies use the same collision, spell, Bomb,
+Ward, and Reraise systems.
+
+Poison and newly placed tiles first damage on the phase after application.
+Poison deals 3 per eligible phase; tiles deal 5 on their affected row for two
+eligible phases, even when unoccupied or blocked by Levitation. Reapplication
+refreshes one record instead of stacking. Refresh during an enemy ability
+preserves an already-earned tick and retains the refreshed duration. Bind blocks
+movement through the next player action, but permits aiming and shooting.
+Esuna removes Poison and Bind; it does not remove a tile. Levitation blocks tile
+damage before Ward can be consumed. Purple outlines beside the player identify
+poisoned rows and remaining phases. Chichu does not apply Doom.
+
+Chichu appears once at column 7, row 3 only after all scripted entries have
+spawned, every required ordinary enemy has died, and a safe boundary is reached.
+It does not attack on arrival. Stage 2 clears after Chichu and every mandatory
+enemy are defeated and the final action finishes, before any further enemy or
+status processing. Mandatory escapes prevent success and lead to defense failure
+once scheduled spawning and active enemies finish. HP depletion is a separate
+knockout outcome. No Stage 3 content is installed.
 
 The orb travels naturally across the launch gap. Top and bottom bounce planes
 extend across that gap; the right wall activates once the whole orb fits inside
@@ -207,8 +259,10 @@ outcomes, normal-play success and defeat, and repeated restarts.
 Spell tests also cover all eight definitions, targeting, payment idempotency,
 turn-based cooldowns, offensive/support effects, statuses, hazards, revival,
 posted numeric/Space input, shared action ownership, animation pause timing,
-read-only HUD rendering, and restart cleanup. Higher-stage tests use isolated
-model fixtures; they do not make later stages playable.
+read-only HUD rendering, and restart cleanup. Stage 2 tests cover all five new
+ordinary enemies, Chichu, real status/hazard applications, two-stage posted-event
+campaigns, both defeat outcomes, and frame-rate determinism. Stage 3 tests use
+isolated model fixtures; they do not make Stage 3 playable.
 The automated suite does not verify physical desktop input or platform compatibility.
 
 Manual smoke test: run `python main.py`, confirm the 960 × 576 menu, then press
@@ -253,6 +307,69 @@ controls without changing model resources. Restart after both outcomes and check
 that the first wave returns. Close the window, and separately test Escape from
 the menu, confirming clean exit without a traceback.
 
+### Stage 2 smoke tests
+
+Complete Stage 1 with the shooting sequence above. At Stage Clear, press Enter,
+confirm Stage 2 Intro and HP/MP/BP 100/100/1, then Enter. Esuna (5) and Levitation
+(6) are now selectable; Meteor (3) remains locked.
+
+For a reproducible Stage 2 clear, use the following actions. All shots aim at
+**(96, 96 + 48 × row)**, horizontally leftward. Move before each action; wait
+for aiming to resume before the next one.
+
+| Turn(s) | Action | Player row |
+|---|---|---:|
+| 1 | Shoot | 3 |
+| 2–3 | Shoot each turn | 0 |
+| 4 | Select 2, Space: Starstorm | 1 |
+| 5–6 | Shoot each turn | 0 |
+| 7 | Shoot | 7 |
+| 8–9 | Shoot each turn | 0 |
+| 10 | Shoot | 1 |
+| 11–12 | Shoot each turn | 0 |
+| 13 | Shoot | 5 |
+| 14–15 | Shoot each turn | 0 |
+| 16 | Shoot | 3 |
+| 17 | Shoot | 0 |
+| 18 | Shoot Chichu | 3 |
+
+Chichu arrives on Turn 18 with 30 HP. The last volley clears Stage 2 at
+**HP 95, MP 60, BP 5**. Enter must keep this Stage Clear screen; R returns to a
+fresh Stage 1 Intro. The fast clear deliberately uses Bomb clusters to prevent
+most abilities; the following separate check lets the new effects operate.
+
+For real status and floor feedback, enter Stage 2 fresh, shoot from rows
+**3, 0, 0** on Turns 1–3, then use these precise mouse targets:
+
+- Turn 4: row 0, click **(480, 456)**.
+- Turn 5: row 2, click **(480, 72)**.
+- Turn 6: row 6, click **(96, 384)**.
+- Turn 7: movement is bound; select **5**, Space for Esuna from row 6. Poison
+  and Bind disappear; the tile still causes 5 damage (HP 95, MP 80).
+- Turn 8: select **6**, Space for Levitation from row 6. The tile is blocked;
+  Cactuar needles still cause 5 damage (HP 90, MP 60).
+
+Pause/resume either spell animation and confirm no duplicate payment, damage,
+status tick, or enemy phase. Continue playing or finish the run before restarting.
+
+For Stage 2 HP defeat, shoot horizontally from row 0 each turn in a fresh Stage 2;
+Game Over occurs on Turn 12 with HP 0. For defense failure with HP remaining,
+follow the Stage 2 clear recipe through Turn 17, then deliberately miss Chichu:
+
+| Turn | Player row | Click target |
+|---:|---:|---|
+| 18 | 0 | (240, 72) |
+| 19–20 | 5 | (650, 360) each turn |
+| 21 | 0 | (740, 72) |
+| 22 | 1 | (740, 96) |
+| 23 | 1 | (480, 72) |
+| 24 | 0 | (96, 360) |
+
+Chichu escapes on Turn 24 and the run ends with **Defense failed, HP 27**,
+MP 60, BP 5. These paths use ordinary movement, aiming, shots, and spell controls;
+no resource or enemy-HP edits are required. Restart after success and both defeats,
+check the Stage 1 first wave, and verify clean window exit.
+
 ## Repository layout
 
 ```text
@@ -269,7 +386,8 @@ src/
   demo.py               Static combat regression fixture
   encounter.py          Validated waves, spawn deferral, and encounter outcomes
   stage_config.py       Strict JSON loader and explicit stage registry validation
-  entities.py           Grid enemies, Stage 1 boss attacks, crystals, and snapshots
+  entities.py           Grid enemies, statistics, crystals, and snapshots
+  enemy_abilities.py    Deterministic Stage 2 attacks, statuses, and hazard placement
   game.py               Window, loop, events, and shutdown
   renderer.py           Asset-free scene display
   states.py             Shared scene and turn-phase names
@@ -288,6 +406,7 @@ config/
   prototype.py          Compatible export of the provisional JSON encounter
   stages/
     stage_01.json       Complete Stage 1 (five waves, Ultros, and Typhon)
+    stage_02.json       Complete Stage 2 (six waves and Chichu)
     prototype_01.json   Preserved historical four-wave regression fixture
     README.md           Public JSON schema and stage lifecycle contract
 tests/
@@ -305,7 +424,9 @@ tests/
   test_turns.py         Enemy phases, contact damage, and defeat rules
   test_turn_integration.py  Consecutive turns, pause, defeat, and rendering
   test_bosses.py        Boss combat, defenses, and atomic group scheduling
-  test_stage_one.py     Canonical gameplay, outcomes, rendering, and determinism
+  test_stage_one.py     Canonical Stage 1 gameplay and regression paths
+  test_stage_two.py     Stage 2 config, two-stage campaign, outcomes, and determinism
+  test_stage_two_enemies.py  Abilities, statuses, hazards, combat, and defenses
   test_stage_config.py  Strict stage schema and prototype compatibility
   test_stage_progression.py  Fixture stage transitions and scheduler boundaries
   test_spell_actions.py  Shared main-action economy and spell turn resolution
@@ -317,4 +438,4 @@ tests/
   test_hazards.py        Floor placement, duration, and defensive precedence
 ```
 
-Stage 2 and Stage 3 content, scoring, persistence, final artwork, and audio are not available.
+Stage 3 content, scoring, persistence, final artwork, and audio are not available.

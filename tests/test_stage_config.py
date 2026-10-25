@@ -189,9 +189,9 @@ class StageConfigTests(unittest.TestCase):
         return data
 
     def test_future_boss_contract_validates_without_live_spawning(self):
-        data = stage_data(2)
+        data = stage_data(3)
         data['boss_wave'] = {'when': 'after_scripted_waves_cleared', 'spawns': [
-            {'id': 3, 'kind': 'chichu', 'col': 0, 'row': 2}]}
+            {'id': 3, 'kind': 'odin', 'col': 0, 'row': 2}]}
         data['completion']['mandatory_enemy_ids'].append(3)
         definition = parse_stage(data)
         self.assertFalse(definition.playable)
@@ -205,7 +205,7 @@ class StageConfigTests(unittest.TestCase):
         self.assertEqual(encounter.spawn_due(2, combat), ())
         self.assertEqual(set(combat.enemies), {1})
         with self.assertRaisesRegex(ValueError, 'Unimplemented boss'):
-            World(stages={1: PROTOTYPE, 2: definition})
+            World(stages={1: PROTOTYPE, 3: definition})
 
     def test_boss_readiness_respects_mandatory_membership_without_treating_escapes_as_kills(self):
         for mandatory in (False, True):

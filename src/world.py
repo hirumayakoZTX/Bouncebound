@@ -35,6 +35,7 @@ from src.player_actions import (
 
 
 STAGE_ONE = load_stage("stage_01.json")
+STAGE_TWO = load_stage("stage_02.json")
 
 
 # Action eligibility is checked by the controller before requesting scene edges.
@@ -114,7 +115,8 @@ class World:
             raise ValueError("Encounter configuration must be an EncounterDefinition")
         if stages is not None and (demo is not None or encounter is not None):
             raise ValueError("Choose a stage registry, a single encounter, or a demo fixture")
-        definitions = stages if stages is not None else {1: encounter or STAGE_ONE}
+        definitions = (stages if stages is not None else {1: encounter} if encounter is not None
+                       else {1: STAGE_ONE, 2: STAGE_TWO})
         self._stage_definitions = validate_stage_registry(definitions)
         self._demo = demo
         self._encounter_definition = self._stage_definitions[1] if demo is None else None
@@ -538,14 +540,21 @@ class World:
                                else GameState.STAGE_CLEAR)
             return True
         initial_statuses = self.statuses.snapshot()
+        initial_hazards = self.hazards.snapshot()
         context = EnemyTurnContext(
             turn_index=self.turn_index,
             damage_player=lambda amount: self.apply_player_damage(amount, source="enemy_contact"),
             attack_player=lambda amount: self.apply_player_damage(amount, source="boss_attack"),
             player_defeated=lambda: self.hp <= 0 or self.state is GameState.GAME_OVER,
+            player_row=self.player_row,
+            ability_player=lambda amount: self.apply_player_damage(amount, source="enemy_ability"),
+            apply_status=lambda kind, duration, source: self.apply_status(
+                kind, duration, source_id=source),
+            place_poison_tile=lambda row, duration, source: self.place_poison_tile(
+                row, duration, source_id=source),
         )
         resolve_enemy_phase(self.enemies.values(), context)
-        process_status_phase(self, initial_statuses)
+        process_status_phase(self, initial_statuses, initial_hazards)
         self.last_resolved_turn = self.turn_index
         if self.hp <= 0 or self.state is GameState.GAME_OVER:
             if self.state is not GameState.GAME_OVER:

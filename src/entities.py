@@ -3,6 +3,9 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
+from types import MappingProxyType
+
+from src.statuses import StatusKind
 
 from src.collision import Bounds
 from src.constants import BATTLEFIELD_ORIGIN, GRID_COLUMNS, GRID_ROWS, TILE_SIZE
@@ -33,6 +36,11 @@ class EnemyTurnContext:
     damage_player: Callable[[int], int]
     player_defeated: Callable[[], bool]
     attack_player: Callable[[int], int] | None = None
+    player_row: int | None = None
+    apply_status: Callable[[StatusKind, int, int], object] | None = None
+    place_poison_tile: Callable[[int, int, int], object] | None = None
+    cell_is_free: Callable[[int, int], bool] | None = None
+    ability_player: Callable[[int], int] | None = None
 
 
 class EnemyType(Enum):
@@ -40,11 +48,30 @@ class EnemyType(Enum):
     BOMB = "bomb"
     ULTROS = "ultros"
     TYPHON = "typhon"
+    CACTUAR = "cactuar"
+    ALLIGATOR = "alligator"
+    BULB = "bulb"
+    MORBOL = "morbol"
+    LANDTRAP = "landtrap"
+    CHICHU = "chichu"
 
 
 STAGE_ONE_BOSSES = frozenset({EnemyType.ULTROS, EnemyType.TYPHON})
 BOSS_HP = 15
 BOSS_ATTACK_DAMAGE = 5
+LIVE_BOSSES = STAGE_ONE_BOSSES | {EnemyType.CHICHU}
+# HP and active-attack damage. All types retain five-HP defense-line contact.
+ENEMY_STATS = MappingProxyType({
+    EnemyType.BASIC: (5, 0), EnemyType.BOMB: (5, 0),
+    EnemyType.ULTROS: (15, 5), EnemyType.TYPHON: (15, 5),
+    EnemyType.CACTUAR: (10, 5), EnemyType.ALLIGATOR: (12, 4),
+    EnemyType.BULB: (8, 0), EnemyType.MORBOL: (18, 0),
+    EnemyType.LANDTRAP: (8, 0), EnemyType.CHICHU: (30, 15),
+})
+ENEMY_UNLOCK_STAGE = MappingProxyType({
+    kind: 1 if kind in {EnemyType.BASIC, EnemyType.BOMB} | STAGE_ONE_BOSSES else 2
+    for kind in EnemyType
+})
 
 
 @dataclass(frozen=True)
@@ -78,13 +105,12 @@ class Enemy:
         if not isinstance(self.enemy_type, EnemyType):
             raise ValueError("Enemy type must be a supported EnemyType")
         cell_bounds(self.grid_col, self.grid_row)
-        if self.is_boss:
-            self.hp = self.max_hp = BOSS_HP
-            self.attack_damage = BOSS_ATTACK_DAMAGE
+        self.hp = self.max_hp = ENEMY_STATS[self.enemy_type][0]
+        self.attack_damage = ENEMY_STATS[self.enemy_type][1]
 
     @property
     def is_boss(self) -> bool:
-        return self.enemy_type in STAGE_ONE_BOSSES
+        return self.enemy_type in LIVE_BOSSES
 
     @property
     def alive(self) -> bool:
@@ -116,14 +142,17 @@ class Enemy:
         return not self.alive
 
     def on_turn(self, context: EnemyTurnContext) -> bool:
-        """Claim once; Stage 1 bosses attack before standard movement/contact."""
+        """Claim once and execute the ability before standard movement/contact."""
         if not self.active or self.last_action_turn == context.turn_index:
             return False
         self.last_action_turn = context.turn_index
         self.turns_alive += 1
-        if self.is_boss:
+        if self.enemy_type in STAGE_ONE_BOSSES:
             damage = context.attack_player or context.damage_player
             damage(self.attack_damage)
+        else:
+            from src.enemy_abilities import execute_ability
+            execute_ability(self, context)
         return True
 
     def advance_one_cell(self) -> bool:

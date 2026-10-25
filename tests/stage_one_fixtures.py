@@ -4,7 +4,7 @@ from itertools import cycle
 
 from src.stage_config import parse_stage
 from src.states import GameState
-from src.world import World
+from src.world import STAGE_ONE, World
 
 
 OPENING_ROWS = (3, 3, 2, 2, 4, 4, 1, 1, 5)
@@ -28,7 +28,7 @@ def boss_definition(*, scripted=False, col=7, rows=(2, 5), reverse=False, capaci
 
 
 def playing(definition=None):
-    world = World(encounter=definition) if definition is not None else World()
+    world = World(encounter=definition or STAGE_ONE)
     world.start_new_run()
     world.transition_to(GameState.PLAYER_AIM)
     return world

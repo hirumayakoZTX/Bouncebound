@@ -1,0 +1,294 @@
+{
+  "schema_version": 1,
+  "stage": 2,
+  "capacity": 25,
+  "waves": [
+    {
+      "turn": 1,
+      "spawns": [
+        {
+          "id": 201,
+          "kind": "bomb",
+          "col": 7,
+          "row": 3
+        },
+        {
+          "id": 202,
+          "kind": "cactuar",
+          "col": 6,
+          "row": 3
+        },
+        {
+          "id": 203,
+          "kind": "landtrap",
+          "col": 6,
+          "row": 2
+        },
+        {
+          "id": 204,
+          "kind": "alligator",
+          "col": 5,
+          "row": 3
+        },
+        {
+          "id": 205,
+          "kind": "crystal",
+          "col": 9,
+          "row": 3
+        }
+      ]
+    },
+    {
+      "turn": 4,
+      "spawns": [
+        {
+          "id": 206,
+          "kind": "bomb",
+          "col": 7,
+          "row": 2
+        },
+        {
+          "id": 207,
+          "kind": "bulb",
+          "col": 6,
+          "row": 2
+        },
+        {
+          "id": 208,
+          "kind": "morbol",
+          "col": 6,
+          "row": 1
+        },
+        {
+          "id": 209,
+          "kind": "landtrap",
+          "col": 5,
+          "row": 2
+        },
+        {
+          "id": 210,
+          "kind": "crystal",
+          "col": 9,
+          "row": 2
+        }
+      ]
+    },
+    {
+      "turn": 7,
+      "spawns": [
+        {
+          "id": 211,
+          "kind": "bomb",
+          "col": 7,
+          "row": 4
+        },
+        {
+          "id": 212,
+          "kind": "cactuar",
+          "col": 6,
+          "row": 4
+        },
+        {
+          "id": 213,
+          "kind": "alligator",
+          "col": 6,
+          "row": 3
+        },
+        {
+          "id": 214,
+          "kind": "bulb",
+          "col": 5,
+          "row": 4
+        },
+        {
+          "id": 215,
+          "kind": "landtrap",
+          "col": 5,
+          "row": 5
+        },
+        {
+          "id": 216,
+          "kind": "crystal",
+          "col": 9,
+          "row": 4
+        }
+      ]
+    },
+    {
+      "turn": 10,
+      "spawns": [
+        {
+          "id": 217,
+          "kind": "bomb",
+          "col": 7,
+          "row": 1
+        },
+        {
+          "id": 218,
+          "kind": "morbol",
+          "col": 6,
+          "row": 1
+        },
+        {
+          "id": 219,
+          "kind": "alligator",
+          "col": 6,
+          "row": 0
+        },
+        {
+          "id": 220,
+          "kind": "bulb",
+          "col": 5,
+          "row": 1
+        },
+        {
+          "id": 221,
+          "kind": "cactuar",
+          "col": 5,
+          "row": 2
+        },
+        {
+          "id": 222,
+          "kind": "crystal",
+          "col": 9,
+          "row": 1
+        }
+      ]
+    },
+    {
+      "turn": 13,
+      "spawns": [
+        {
+          "id": 223,
+          "kind": "bomb",
+          "col": 7,
+          "row": 5
+        },
+        {
+          "id": 224,
+          "kind": "morbol",
+          "col": 6,
+          "row": 5
+        },
+        {
+          "id": 225,
+          "kind": "landtrap",
+          "col": 6,
+          "row": 4
+        },
+        {
+          "id": 226,
+          "kind": "cactuar",
+          "col": 5,
+          "row": 5
+        },
+        {
+          "id": 227,
+          "kind": "alligator",
+          "col": 5,
+          "row": 6
+        },
+        {
+          "id": 228,
+          "kind": "crystal",
+          "col": 9,
+          "row": 5
+        }
+      ]
+    },
+    {
+      "turn": 16,
+      "spawns": [
+        {
+          "id": 229,
+          "kind": "bomb",
+          "col": 7,
+          "row": 3
+        },
+        {
+          "id": 230,
+          "kind": "morbol",
+          "col": 6,
+          "row": 3
+        },
+        {
+          "id": 231,
+          "kind": "bulb",
+          "col": 6,
+          "row": 2
+        },
+        {
+          "id": 232,
+          "kind": "alligator",
+          "col": 5,
+          "row": 3
+        },
+        {
+          "id": 233,
+          "kind": "landtrap",
+          "col": 5,
+          "row": 4
+        },
+        {
+          "id": 234,
+          "kind": "cactuar",
+          "col": 4,
+          "row": 3
+        },
+        {
+          "id": 235,
+          "kind": "crystal",
+          "col": 9,
+          "row": 3
+        }
+      ]
+    }
+  ],
+  "boss_wave": {
+    "when": "after_scripted_waves_cleared",
+    "spawns": [
+      {
+        "id": 300,
+        "kind": "chichu",
+        "col": 7,
+        "row": 3
+      }
+    ],
+    "escape_policy": "contact_and_fail"
+  },
+  "completion": {
+    "mandatory_enemy_ids": [
+      201,
+      202,
+      203,
+      204,
+      206,
+      207,
+      208,
+      209,
+      211,
+      212,
+      213,
+      214,
+      215,
+      217,
+      218,
+      219,
+      220,
+      221,
+      223,
+      224,
+      225,
+      226,
+      227,
+      229,
+      230,
+      231,
+      232,
+      233,
+      234,
+      300
+    ],
+    "final": false
+  }
+}

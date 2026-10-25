@@ -25,7 +25,8 @@ class Renderer:
         elif snapshot.state is GameState.STAGE_INTRO:
             self._center_text(screen, f"Stage {snapshot.stage}", 240, heading=True)
             if snapshot.total_waves:
-                self._center_text(screen, (f"Stage 1: {snapshot.total_waves} waves + Ultros and Typhon"
+                self._center_text(screen, (f"Stage {snapshot.stage}: {snapshot.total_waves} waves + "
+                                           + ("Ultros and Typhon" if snapshot.stage == 1 else "Chichu")
                                            if snapshot.has_boss_wave else
                                            f"Prototype: {snapshot.total_waves} scripted waves"), 285)
             self._center_text(screen, "Enter: Continue", 320)
@@ -82,7 +83,16 @@ class Renderer:
             for effect in snapshot.statuses
         )
         self._hud_text(screen, "Status: " + statuses if statuses else
-                       "Green: Slime | Red: Bomb | Purple: Ultros | Gold: Typhon | Blue: BP", 56)
+                       ("C: Cactuar | A: Alligator | Bu: Bulb | M: Morbol | L: Landtrap | Ch: Chichu"
+                        if snapshot.stage == 2 else
+                        "Green: Slime | Red: Bomb | Purple: Ultros | Gold: Typhon | Blue: BP"), 56)
+        for tile in snapshot.hazards:
+            # PoisonTiles affect the player lane, never projectile collision geometry.
+            row_rect = pygame.Rect(snapshot.player_position[0] - 24,
+                                   BATTLEFIELD_ORIGIN[1] + 48 * tile.row, 48, 48)
+            pygame.draw.rect(screen, (125, 68, 146), row_rect, width=3)
+            label = self.hud_font.render(str(tile.remaining_turns), True, (221, 158, 242))
+            screen.blit(label, row_rect.topleft)
         for enemy in snapshot.enemies:
             rect = pygame.Rect(enemy.bounds.left, enemy.bounds.top,
                                enemy.bounds.right - enemy.bounds.left,
@@ -92,6 +102,12 @@ class Renderer:
                 EnemyType.BOMB: ((190, 75, 79), "B"),
                 EnemyType.ULTROS: ((148, 100, 204), "U"),
                 EnemyType.TYPHON: ((205, 151, 59), "T"),
+                EnemyType.CACTUAR: ((30, 125, 90), "C"),
+                EnemyType.ALLIGATOR: ((89, 113, 54), "A"),
+                EnemyType.BULB: ((159, 85, 143), "Bu"),
+                EnemyType.MORBOL: ((84, 85, 157), "M"),
+                EnemyType.LANDTRAP: ((147, 91, 48), "L"),
+                EnemyType.CHICHU: ((188, 86, 27), "Ch"),
             }[enemy.enemy_type]
             pygame.draw.rect(screen, color, rect, border_radius=6)
             label = self.body_font.render(f"{prefix}{enemy.hp}", True, (255, 255, 255))

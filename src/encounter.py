@@ -5,7 +5,7 @@ from enum import Enum
 from types import MappingProxyType
 
 from src.combat import Combat
-from src.entities import Crystal, Enemy, EnemyType, STAGE_ONE_BOSSES, cell_bounds, validate_id
+from src.entities import Crystal, Enemy, EnemyType, ENEMY_UNLOCK_STAGE, LIVE_BOSSES, cell_bounds, validate_id
 from src.constants import GRID_COLUMNS, GRID_ROWS
 
 
@@ -21,8 +21,9 @@ class Spawn:
 
     def __post_init__(self) -> None:
         validate_id(self.entity_id)
-        if type(self.kind) is not str or self.kind not in ("basic", "bomb", "crystal"):
-            raise ValueError("Spawn kind must be basic, bomb, or crystal")
+        kinds = {kind.value for kind in EnemyType if kind not in LIVE_BOSSES} | {"crystal"}
+        if type(self.kind) is not str or self.kind not in kinds:
+            raise ValueError("Spawn kind must be a supported ordinary enemy or crystal")
         cell_bounds(self.col, self.row)
 
 
@@ -103,6 +104,9 @@ class EncounterDefinition:
         turns = [wave.turn for wave in self.waves]
         if turns[0] != 1 or any(a >= b for a, b in zip(turns, turns[1:])):
             raise ValueError("Waves must start on Turn 1 and use increasing spawn turns")
+        if any(ENEMY_UNLOCK_STAGE[EnemyType(spawn.kind)] > self.stage
+               for wave in self.waves for spawn in wave.spawns if spawn.kind != "crystal"):
+            raise ValueError("Enemy kind is unavailable in the configured stage")
         boss_spawns = self.boss_wave.spawns if self.boss_wave else ()
         if any(BOSS_STAGES[spawn.kind] != self.stage for spawn in boss_spawns):
             raise ValueError("Boss kinds must belong to the configured stage")
@@ -140,7 +144,7 @@ class EncounterDefinition:
     @property
     def playable(self) -> bool:
         return (self.boss_wave is None or all(
-            spawn.kind in {kind.value for kind in STAGE_ONE_BOSSES}
+            spawn.kind in {kind.value for kind in LIVE_BOSSES}
             for spawn in self.boss_wave.spawns))
 
 
