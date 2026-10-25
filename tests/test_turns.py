@@ -10,6 +10,7 @@ from src.projectile import HitEvent
 from src.states import GameState
 from src.turns import resolve_enemy_phase
 from src.world import World
+from src.encounter import EncounterDefinition, Spawn, Wave
 
 
 class TurnTests(unittest.TestCase):
@@ -333,7 +334,10 @@ class TurnTests(unittest.TestCase):
         self.assertEqual(survivor.grid_col, 1)
 
     def test_stage_end_claim_completes_action_before_enemy_phase(self) -> None:
-        enemy = self.add_enemy()
+        self.world = World(encounter=EncounterDefinition(1, (Wave(1, (Spawn(1, "basic", 4, 3),)),)))
+        self.world.start_new_run()
+        self.world.transition_to(GameState.PLAYER_AIM)
+        enemy = self.world.enemies[1]
         self.finish_shot()
         with patch.object(self.world, "check_stage_end", return_value=True):
             self.assertTrue(self.world.resolve_turn())

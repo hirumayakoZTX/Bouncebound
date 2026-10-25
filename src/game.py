@@ -41,6 +41,10 @@ class Game:
                 self.world.start_new_run()
             elif self.world.state is GameState.STAGE_INTRO:
                 self.world.transition_to(GameState.PLAYER_AIM)
+            elif self.world.state is GameState.STAGE_CLEAR:
+                self.world.advance_stage()
+            elif self.world.state is GameState.VICTORY:
+                self.world.transition_to(GameState.RESULTS)
         elif event.key == pygame.K_r and not getattr(event, "repeat", False):
             self.world.restart()
         elif event.key == pygame.K_ESCAPE:

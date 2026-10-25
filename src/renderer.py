@@ -40,6 +40,14 @@ class Renderer:
                 f"MP {snapshot.mp}/{snapshot.max_mp} | BP {snapshot.bp}", 320,
             )
             self._center_text(screen, "Press R to Restart", 380)
+            if snapshot.next_stage_available:
+                self._center_text(screen, "Enter: Next stage", 420)
+        elif snapshot.state in (GameState.VICTORY, GameState.RESULTS):
+            self._center_text(screen, "Victory" if snapshot.state is GameState.VICTORY
+                              else "Results", 230, heading=True)
+            if snapshot.state is GameState.VICTORY:
+                self._center_text(screen, "Enter: Results", 310)
+            self._center_text(screen, "Press R to Restart", 350)
         elif snapshot.state in ACTIVE_STATES or snapshot.state is GameState.PAUSED:
             self._draw_battlefield(screen, snapshot)
             if snapshot.state is GameState.PAUSED:

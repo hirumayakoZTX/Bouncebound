@@ -108,6 +108,11 @@ Blue crystals are non-reflecting: orbs pass through them without damage or a hit
 count cost. Each crystal queues +1 BP once, applied only after the entire shot
 finishes, up to BP 5. New BP affects the next shot, never the orbs already flying.
 
+The provisional Stage 1 encounter is loaded from `config/stages/prototype_01.json`.
+The [stage configuration format](config/stages/README.md) documents validation and
+scheduling. Only this provisional encounter is installed; later-stage content
+is not available.
+
 The prototype contains 24 enemies in four waves of six, scheduled for Turns 1,
 3, 5, and 7, with one blue crystal per wave. Adjacent Bombs can clear nearby
 Slimes through chain reactions. The initial wave appears when entering the
@@ -217,7 +222,8 @@ src/
   collision.py          Swept circle/rectangle geometry and target bounds
   combat.py             Enemy damage, queued Bomb chains, and deferred BP
   demo.py               Static combat regression fixture
-  encounter.py          Validated prototype waves, spawn scheduling, and outcomes
+  encounter.py          Validated waves, spawn deferral, and encounter outcomes
+  stage_config.py       Strict JSON loader and explicit stage registry validation
   entities.py           Plain grid enemy/crystal models and snapshots
   game.py               Window, loop, events, and shutdown
   renderer.py           Asset-free scene display
@@ -234,7 +240,10 @@ src/
   hazards.py            Validated row-based PoisonTiles and refresh/expiry
 assets/                 Asset directory (.gitkeep only; no assets required)
 config/
-  prototype.py          Four-wave prototype definition (24 enemies, four crystals)
+  prototype.py          Compatible export of the provisional JSON encounter
+  stages/
+    prototype_01.json   Original four-wave prototype (24 enemies, four crystals)
+    README.md           Public JSON schema and stage lifecycle contract
 tests/
   test_bootstrap.py     Headless application checks
   test_encounter.py     Configuration, spawning, outcomes, and reset checks
@@ -249,6 +258,8 @@ tests/
   test_combat_integration.py  Live target synchronization, BP fans, and demo
   test_turns.py         Enemy phases, contact damage, and defeat rules
   test_turn_integration.py  Consecutive turns, pause, defeat, and rendering
+  test_stage_config.py  Strict stage schema and prototype compatibility
+  test_stage_progression.py  Fixture stage transitions and scheduler boundaries
   test_spell_actions.py  Shared main-action economy and spell turn resolution
   test_spell_ui.py       Posted input, spell animation, HUD, and restart
   test_spell*.py         Spell definitions, validation, payment, and integration

@@ -19,6 +19,11 @@ from src.world import World
 
 
 def world_in_state(state: GameState) -> World:
+    # Explicit terminal UI fixtures; stage authorization is tested through real encounters.
+    if state in (GameState.STAGE_CLEAR, GameState.VICTORY, GameState.RESULTS):
+        world = World()
+        world._state = state
+        return world
     paths = {
         GameState.MENU: (),
         GameState.STAGE_INTRO: (GameState.STAGE_INTRO,),
@@ -107,7 +112,8 @@ class SceneTests(unittest.TestCase):
                 game = self.game_in_state(state)
                 before = deepcopy(vars(game.world))
                 keys = (pygame.K_SPACE, pygame.K_1) if state is not GameState.PLAYER_AIM else ()
-                if state not in (GameState.GAME_OVER, GameState.STAGE_CLEAR):
+                if state not in (GameState.GAME_OVER, GameState.STAGE_CLEAR,
+                                 GameState.VICTORY, GameState.RESULTS):
                     keys += (pygame.K_r,)
                 for key in keys:
                     game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))

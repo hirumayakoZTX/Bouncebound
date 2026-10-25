@@ -39,14 +39,16 @@ class WorldTests(unittest.TestCase):
         for target in (
             GameState.STAGE_INTRO, GameState.PLAYER_AIM,
             GameState.SHOT_ANIMATION, GameState.TURN_RESOLVE, GameState.PLAYER_AIM,
-            GameState.SPELL_ANIMATION, GameState.STAGE_CLEAR, GameState.STAGE_INTRO,
-            GameState.PLAYER_AIM, GameState.SHOT_ANIMATION,
-            GameState.VICTORY, GameState.RESULTS,
+            GameState.SPELL_ANIMATION, GameState.TURN_RESOLVE,
         ):
             with self.subTest(target=target):
                 self.assertTrue(world.transition_to(target))
                 self.assertIs(world.state, target)
                 self.assertEqual(world.turn_index, 1)
+        for reserved in (GameState.STAGE_CLEAR, GameState.VICTORY, GameState.RESULTS):
+            before = deepcopy(vars(world))
+            self.assertFalse(world.transition_to(reserved))
+            self.assertEqual(vars(world), before)
 
     def test_invalid_transitions_are_atomic(self) -> None:
         world = World()

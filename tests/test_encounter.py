@@ -72,7 +72,7 @@ class EncounterDefinitionTests(unittest.TestCase):
 
     def test_encounter_validation_rejects_bad_stage_order_ids_and_empty_enemy_set(self):
         first = Wave(1, (Spawn(1, "basic", 0, 0),))
-        for stage, waves in ((2, (first,)), (True, (first,)), (1, ()),
+        for stage, waves in ((4, (first,)), (True, (first,)), (1, ()),
                              (1, [first]), (1, (None,)),
                              (1, (Wave(3, first.spawns),)), (1, (first, first)),
                              (1, (first, Wave(3, first.spawns))),

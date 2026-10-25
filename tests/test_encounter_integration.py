@@ -26,7 +26,7 @@ class EncounterIntegrationTests(unittest.TestCase):
     def key(self, value, **extra):
         return pygame.event.Event(pygame.KEYDOWN, key=value, **extra)
 
-    def test_r_restarts_only_game_over_and_stage_clear_and_ignores_repeat(self):
+    def test_r_restarts_terminal_scenes_and_ignores_repeat(self):
         for state in GameState:
             with self.subTest(state=state):
                 game = Game()
@@ -37,7 +37,8 @@ class EncounterIntegrationTests(unittest.TestCase):
                 game.handle_event(self.key(pygame.K_r, repeat=True))
                 self.assertEqual(vars(game.world), before)
                 game.handle_event(self.key(pygame.K_r))
-                if state in (GameState.GAME_OVER, GameState.STAGE_CLEAR):
+                if state in (GameState.GAME_OVER, GameState.STAGE_CLEAR,
+                             GameState.VICTORY, GameState.RESULTS):
                     expected = World()
                     expected.start_new_run()
                     self.assertEqual(vars(game.world), vars(expected))
