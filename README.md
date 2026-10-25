@@ -190,14 +190,10 @@ A reproducible clear uses horizontal shots from these rows on Turns 1 through 7:
 four waves with HP 100 and BP 5. Empty turns still require a normal shot. Confirm
 Stage Clear, press R, and verify the fresh introduction and initial battlefield.
 
-To check spells, restart and press 1 then Space on the initial row. Confirm the
-first Bomb chain, MP 70, a brief Pom Fire effect, and exactly one enemy phase.
-Press Space again on Turn 2: the cooldown message must consume no MP or turn.
-Select 7 and cast Ward, pausing/resuming its animation with Escape. On the next
-turn, selecting 8 and casting Reraise should show "Not enough MP". Shooting must
-remain available. Keys 3, 5, and 6 should show "Spell locked". Restart to restore
-MP. For a clear ending with a spell, follow the seven-row shooting recipe above
-but cast Fire instead of shooting on Turn 7; the last crystal need not be collected.
+To check spells, restart and press 1 then Space on the initial row. Confirm the first Bomb chain, MP 70, a brief Pom Fire effect, and exactly one enemy phase. Press Space again on Turn 2: the cooldown message must consume no MP or turn.
+Select 7 and cast Ward, pausing/resuming its animation with Escape. On the next turn, selecting 8 and casting Reraise should show "Not enough MP". Shooting must remain available. Keys 3, 5, and 6 should show "Spell locked".
+To repeat the spell smoke test with full MP, finish the encounter and press R on the Stage Clear or Game Over screen. Alternatively, close and relaunch the application. Pressing R during an active turn does not restart the run.
+For a clear ending with a spell, follow the seven-row shooting recipe above but cast Fire instead of shooting on Turn 7; the last crystal need not be collected.
 
 For HP-based defeat, shoot horizontally from row 0 every turn. Enemies should
 advance and escape; this reaches Game Over with HP 0. For defense failure with HP
