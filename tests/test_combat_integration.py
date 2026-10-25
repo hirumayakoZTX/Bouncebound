@@ -36,8 +36,9 @@ class CombatIntegrationTests(unittest.TestCase):
         self.assertIs(self.world.state, GameState.TURN_RESOLVE)
 
     def install_orbs(self, orbs: list[Projectile]) -> None:
+        self.world.set_aim_target((96, 240))
+        self.assertTrue(self.world.fire())
         self.world.projectiles = orbs
-        self.world.transition_to(GameState.SHOT_ANIMATION)
 
     def test_projectile_damage_kills_and_disables_target_immediately(self) -> None:
         enemy = Enemy(1, EnemyType.BASIC, 4, 3)
@@ -156,13 +157,13 @@ class CombatIntegrationTests(unittest.TestCase):
         self.assertEqual(len(self.world.projectiles), 1)
         self.finish_shot()
         self.assertEqual(self.world.bp, 2)
-        self.assertTrue(self.world.transition_to(GameState.PLAYER_AIM))
+        self.assertTrue(self.world.resolve_turn())
         self.assertTrue(self.world.fire())
         self.assertEqual([orb.projectile_id for orb in self.world.projectiles], [2, 3])
         self.assertEqual(self.world.bp, 2)
         self.finish_shot()
         self.assertEqual(self.world.bp, 2)
-        self.assertEqual(self.world.turn_index, 1)
+        self.assertEqual(self.world.turn_index, 2)
 
     def test_requested_fans_have_correct_counts_symmetry_speed_and_unique_ids(self) -> None:
         expected = {1: [0], 2: [-2.5, 2.5], 3: [-5, 0, 5],

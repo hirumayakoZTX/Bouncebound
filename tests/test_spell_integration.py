@@ -29,14 +29,19 @@ class SpellIntegrationTests(unittest.TestCase):
     def tearDown(self) -> None:
         pygame.quit()
 
-    def test_all_numeric_spell_keys_and_space_remain_unbound(self) -> None:
-        before = deepcopy(vars(self.game.world))
+    def test_spell_selection_is_free_and_space_uses_the_shared_cast_pipeline(self):
+        world = self.game.world
+        before = deepcopy(world.combat)
         for key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5,
-                    pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_SPACE):
+                    pygame.K_6, pygame.K_7, pygame.K_8):
             self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
-            self.assertEqual(vars(self.game.world), before)
-        self.assertEqual(self.game.world.mp, 100)
-        self.assertEqual(dict(self.game.world.spells.cooldowns), {})
+        self.assertEqual(world.combat, before)
+        self.assertEqual((world.mp, world.turn_index), (100, 1))
+        self.assertEqual(dict(world.spells.cooldowns), {})
+        self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE))
+        self.assertIs(world.state, GameState.SPELL_ANIMATION)
+        self.assertEqual((world.mp, world.turn_index), (50, 1))
+        self.assertTrue(world.reraise_used)
 
     def test_validation_and_commit_do_not_execute_combat_enemy_phases_or_animation(self) -> None:
         world = self.game.world

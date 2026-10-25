@@ -1,6 +1,6 @@
 """Run data and validated scene transitions without rendering dependencies."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import isfinite
 
 from config.prototype import PROTOTYPE
@@ -19,12 +19,17 @@ from src.entities import (
     Crystal, CrystalSnapshot, Enemy, EnemySnapshot, EnemyTurnContext, validate_damage,
 )
 from src.turns import resolve_enemy_phase
-from src.spells import SpellContext, SpellEngine, SpellId, SpellResult, StatusCheck
-from src.offensive_spells import OffensiveSpellResult, execute_offensive
+from src.spells import (
+    SpellContext, SpellEngine, SpellFailure, SpellId, SpellResult, StatusCheck, get_spell,
+)
+from src.offensive_spells import OFFENSIVE_DAMAGE, OffensiveSpellResult, execute_offensive
 from src.statuses import StatusEffect, StatusEvent, StatusEventKind, StatusKind, StatusState
 from src.hazards import HazardState, PoisonTile
 from src.status_runtime import process_status_phase
 from src.support_spells import SupportSpellResult, execute_support
+from src.player_actions import (
+    ActionKind, MainAction, SpellHUD, SPELL_ANIMATION_SECONDS, spell_failure_message,
+)
 
 
 # Action eligibility is checked by the controller before requesting scene edges.
@@ -80,6 +85,12 @@ class WorldSnapshot:
     reraise_used: bool = False
     hazards: tuple[PoisonTile, ...] = ()
     status_events: tuple[StatusEvent, ...] = ()
+    selected_spell: SpellId | None = None
+    spell_hud: SpellHUD | None = None
+    spell_feedback: str = ""
+    pending_action: MainAction | None = None
+    spell_remaining: float = 0.0
+    spell_result: OffensiveSpellResult | SupportSpellResult | None = None
 
 
 class World:
@@ -145,9 +156,64 @@ class World:
         self.combat = create_demo_combat() if self._demo else Combat()
         self.encounter = (Encounter(self._encounter_definition)
                           if self._encounter_definition is not None else None)
-        self._pending_turn: int | None = None
+        self._pending_action: MainAction | None = None
+        self._next_action_id = 1
+        self.selected_spell: SpellId | None = None
+        self.spell_feedback = ""
+        self._spell_remaining = 0.0
+        self.last_spell_result: OffensiveSpellResult | SupportSpellResult | None = None
         self.last_resolved_turn: int | None = None
         self.game_over_reason: GameOverReason | None = None
+
+    @property
+    def _pending_turn(self) -> int | None:
+        """Compatibility view of the single pending action's turn."""
+        return self._pending_action.turn if self._pending_action else None
+
+    def _can_act(self) -> bool:
+        return (self.state is GameState.PLAYER_AIM and self.hp > 0
+                and self._pending_action is None and not self.projectiles)
+
+    def _action_id(self) -> tuple[str, int]:
+        sequence = self._next_action_id
+        while self.spells.has_committed_action(f"player-action:{sequence}"):
+            sequence += 1
+        return f"player-action:{sequence}", sequence
+
+    def select_spell(self, spell_id: SpellId | str) -> bool:
+        if not self._can_act():
+            return False
+        definition = get_spell(spell_id)
+        failure = (SpellFailure.INVALID_SPELL if definition is None else
+                   SpellFailure.STAGE_LOCKED if self.stage < definition.unlock_stage else None)
+        if failure is not None:
+            self.spell_feedback = spell_failure_message(failure)
+            return False
+        self.selected_spell = definition.spell_id
+        self.spell_feedback = f"Spell selected: {definition.name}"
+        return True
+
+    def cast_selected_spell(self) -> SpellResult:
+        """Execute once, then claim the same main-action lifecycle used by shots."""
+        if not self._can_act():
+            return SpellResult(failure=SpellFailure.INVALID_STATE)
+        if self.selected_spell is None:
+            self.spell_feedback = spell_failure_message(SpellFailure.NO_SELECTION)
+            return SpellResult(failure=SpellFailure.NO_SELECTION)
+        action_id, sequence = self._action_id()
+        executor = (self.execute_offensive_spell if self.selected_spell in OFFENSIVE_DAMAGE
+                    else self.execute_support_spell)
+        result = executor(action_id, self.selected_spell)
+        if not result.valid:
+            self.spell_feedback = spell_failure_message(result.failure)
+            return result.commit
+        self._pending_action = MainAction(action_id, ActionKind.SPELL, self.turn_index)
+        self._next_action_id = sequence + 1
+        self.last_spell_result = result
+        self._spell_remaining = SPELL_ANIMATION_SECONDS
+        self.spell_feedback = f"Cast: {get_spell(result.cast.spell_id).name}"
+        self.transition_to(GameState.SPELL_ANIMATION)
+        return result.commit
 
     def start_new_run(self) -> None:
         self.reset()
@@ -235,8 +301,7 @@ class World:
 
     def fire(self) -> bool:
         """Capture current BP and launch its complete, independent orb fan."""
-        if (self.state is not GameState.PLAYER_AIM or self.aim_target is None
-                or self.projectiles):
+        if not self._can_act() or self.aim_target is None:
             return False
         if not self.set_aim_target(self.aim_target):
             return False
@@ -245,14 +310,30 @@ class World:
                             for index, velocity in enumerate(velocities)]
         self._next_projectile_id += len(velocities)
         self._physics.accumulator = 0.0
-        self._pending_turn = self.turn_index
+        action_id, sequence = self._action_id()
+        self._pending_action = MainAction(action_id, ActionKind.SHOT, self.turn_index)
+        self._next_action_id = sequence + 1
+        self.spell_feedback = ""
+        self.last_spell_result = None
         return self.transition_to(GameState.SHOT_ANIMATION)
 
     def advance_time(
         self, dt: float, targets: tuple[Target, ...] = ()
     ) -> tuple[HitEvent, ...]:
         """Resolve each impact synchronously; returned events are already applied."""
-        if self.state is not GameState.SHOT_ANIMATION:
+        action = self._pending_action
+        if action is None or action.completed or action.turn != self.turn_index:
+            return ()
+        if self.state is GameState.SPELL_ANIMATION and action.kind is ActionKind.SPELL:
+            if type(dt) not in (int, float) or not isfinite(dt) or dt < 0:
+                raise ValueError("Elapsed time must be finite and nonnegative")
+            self._spell_remaining = max(0.0, self._spell_remaining - dt)
+            if self._spell_remaining <= 1e-9:
+                self._spell_remaining = 0.0
+                self._pending_action = replace(action, completed=True)
+                self.transition_to(GameState.TURN_RESOLVE)
+            return ()
+        if self.state is not GameState.SHOT_ANIMATION or action.kind is not ActionKind.SHOT:
             return ()
         events = self._physics.advance(
             dt, self.projectiles,
@@ -262,19 +343,20 @@ class World:
         self.projectiles = [orb for orb in self.projectiles if orb.active]
         if not self.projectiles:
             self.bp = self.combat.finish_shot(self.bp)
+            self._pending_action = replace(action, completed=True)
             self.transition_to(GameState.TURN_RESOLVE)
         return events
 
     def spell_context(self) -> SpellContext:
-        """Read-only adapter; no spell input or effect path is enabled yet."""
-        snapshot = self.snapshot()
+        """Read-only adapter for current targets, resources, and action ownership."""
         return SpellContext(
-            state=snapshot.state, stage=snapshot.stage, turn_index=snapshot.turn_index,
-            hp=snapshot.hp, max_hp=snapshot.max_hp, mp=snapshot.mp,
-            player_row=snapshot.player_row, player_position=snapshot.player_position,
-            enemies=snapshot.enemies,
-            action_pending=bool(self.projectiles) or self._pending_turn is not None,
-            statuses=snapshot.statuses, reraise_used=snapshot.reraise_used,
+            state=self.state, stage=self.stage, turn_index=self.turn_index,
+            hp=self.hp, max_hp=self.max_hp, mp=self.mp,
+            player_row=self.player_row, player_position=self.player_position,
+            enemies=tuple(enemy.snapshot() for enemy in sorted(
+                self.enemies.values(), key=lambda enemy: enemy.enemy_id) if enemy.active),
+            action_pending=bool(self.projectiles) or self._pending_action is not None,
+            statuses=self.statuses.snapshot(), reraise_used=self.reraise_used,
         )
 
     def validate_spell(self, spell_id: SpellId | str, *,
@@ -288,7 +370,7 @@ class World:
 
     def execute_offensive_spell(self, action_id: str, spell_id: SpellId | str, *,
                                 status_check: StatusCheck | None = None) -> OffensiveSpellResult:
-        """Model-only commit/effects; main-action claiming and turns remain deferred."""
+        """Low-level commit/effects; player input uses cast_selected_spell."""
         return execute_offensive(action_id, spell_id, self, self.spells, self.combat,
                                  status_check=status_check)
 
@@ -369,12 +451,13 @@ class World:
         return lost
 
     def _end_run(self, reason: GameOverReason) -> None:
-        self._pending_turn = None
+        self._pending_action = None
+        self._spell_remaining = 0.0
         self.game_over_reason = reason
         self.transition_to(GameState.GAME_OVER)
 
     def check_stage_end(self) -> bool:
-        """A prototype clears only after the final shot and all required defeats."""
+        """A prototype clears only after the final action and all required defeats."""
         return (self.state is GameState.TURN_RESOLVE
                 and not any(orb.active for orb in self.projectiles)
                 and not self.combat.pending_deaths and self.pending_bp == 0
@@ -382,8 +465,10 @@ class World:
                 and self.encounter.outcome(self.combat) is EncounterOutcome.CLEARED)
 
     def resolve_turn(self) -> bool:
-        """Resolve one completed shot exactly once, without requiring a draw call."""
+        """Resolve one completed main action exactly once, without a draw call."""
         if (self.state is not GameState.TURN_RESOLVE
+                or self._pending_action is None
+                or not self._pending_action.completed
                 or self._pending_turn != self.turn_index
                 or any(orb.active for orb in self.projectiles)):
             return False
@@ -392,7 +477,7 @@ class World:
             return True
         self.bp = self.combat.finish_shot(self.bp)
         # Claim the action before invoking hooks, preventing repeated/reentrant phases.
-        self._pending_turn = None
+        self._pending_action = None
         if self.check_stage_end():
             self.transition_to(GameState.STAGE_CLEAR)
             return True
@@ -413,11 +498,17 @@ class World:
             self._end_run(GameOverReason.DEFENSE_FAILED)
         else:
             self.turn_index += 1
+            self.spell_feedback = ""
+            self.last_spell_result = None
             self.spawn_waves()
             self.transition_to(GameState.PLAYER_AIM)
         return True
 
     def snapshot(self) -> WorldSnapshot:
+        definition = get_spell(self.selected_spell) if self.selected_spell is not None else None
+        hud = (SpellHUD(definition, self.spells.next_ready_turn(self.selected_spell),
+                        self.validate_spell(self.selected_spell).failure)
+               if definition is not None else None)
         return WorldSnapshot(
             state=self.state,
             stage=self.stage,
@@ -448,4 +539,10 @@ class World:
             reraise_used=self.reraise_used,
             hazards=self.hazards.snapshot(),
             status_events=self.status_events,
+            selected_spell=self.selected_spell,
+            spell_hud=hud,
+            spell_feedback=self.spell_feedback,
+            pending_action=self._pending_action,
+            spell_remaining=self._spell_remaining,
+            spell_result=self.last_spell_result,
         )

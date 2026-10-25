@@ -42,13 +42,19 @@ class OffensiveIntegrationTests(unittest.TestCase):
         self.assertIs(world.state, GameState.TURN_RESOLVE)
         self.assertTrue(world.resolve_turn())
 
-    def test_all_spell_hotkeys_remain_inactive_despite_available_model_effect_api(self):
+    def test_spell_selection_is_free_and_space_uses_the_shared_cast_pipeline(self):
         world = self.game.world
-        before = deepcopy(vars(world))
+        before = deepcopy(world.combat)
         for key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5,
-                    pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_SPACE):
+                    pygame.K_6, pygame.K_7, pygame.K_8):
             self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
-            self.assertEqual(vars(world), before)
+        self.assertEqual(world.combat, before)
+        self.assertEqual((world.mp, world.turn_index), (100, 1))
+        self.assertEqual(dict(world.spells.cooldowns), {})
+        self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE))
+        self.assertIs(world.state, GameState.SPELL_ANIMATION)
+        self.assertEqual((world.mp, world.turn_index), (50, 1))
+        self.assertTrue(world.reraise_used)
 
     def test_rendering_after_damage_and_chains_never_mutates_or_reexecutes_effects(self):
         world = self.game.world

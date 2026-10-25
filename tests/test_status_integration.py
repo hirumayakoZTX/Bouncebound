@@ -111,9 +111,13 @@ class StatusIntegrationTests(unittest.TestCase):
         before = deepcopy(vars(owner))
         for _ in range(20):
             renderer.draw(screen, owner.snapshot())
-        for value in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_SPACE):
-            game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=value))
         self.assertEqual(vars(owner), before)
+        for value in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8):
+            game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=value))
+        self.assertEqual(owner.snapshot().statuses, before['statuses'].snapshot())
+        self.assertEqual(owner.snapshot().hazards, before['hazards'].snapshot())
+        self.assertEqual((owner.hp, owner.mp, owner.turn_index), (100, 100, 1))
+        before = deepcopy(vars(owner))
         for value in (pygame.K_w, pygame.K_s, pygame.K_UP, pygame.K_DOWN):
             game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=value))
         self.assertEqual(vars(owner), before)

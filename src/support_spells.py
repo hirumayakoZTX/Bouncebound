@@ -1,7 +1,7 @@
 """Model-only support changes; status runtime is resolved through World turns.
 
-Distinct action IDs may still commit different spells in one turn. Player-facing
-casting and enforcement of one main action per turn belong to later integration.
+Low-level calls do not claim actions. Player input uses World's casting entry
+point to claim one main action and resolve the shared turn lifecycle.
 """
 
 from dataclasses import dataclass

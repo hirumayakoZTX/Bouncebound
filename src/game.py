@@ -6,6 +6,11 @@ from src.constants import LOGICAL_SIZE, TARGET_FPS, WINDOW_TITLE
 from src.renderer import Renderer
 from src.states import ACTIVE_STATES, GameState
 from src.world import World
+from src.spells import SpellId
+
+
+SPELL_KEYS = dict(zip((pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4,
+                       pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8), SpellId))
 
 
 class Game:
@@ -50,6 +55,10 @@ class Game:
                 self.world.move_player(-1)
             elif event.key in (pygame.K_s, pygame.K_DOWN):
                 self.world.move_player(1)
+            elif event.key in SPELL_KEYS:
+                self.world.select_spell(SPELL_KEYS[event.key])
+            elif event.key == pygame.K_SPACE:
+                self.world.cast_selected_spell()
 
     def run(self) -> None:
         try:
@@ -72,8 +81,9 @@ class Game:
                         break
                 if not self.running:
                     break
-                # Do not charge a new shot or a resumed shot for the prior frame.
-                if previous_state is self.world.state is GameState.SHOT_ANIMATION:
+                # New or resumed animations must not consume the prior frame's elapsed time.
+                if (previous_state is self.world.state
+                        and self.world.state in (GameState.SHOT_ANIMATION, GameState.SPELL_ANIMATION)):
                     self.world.advance_time(elapsed)
                 elif self.world.state is GameState.TURN_RESOLVE:
                     self.world.resolve_turn()

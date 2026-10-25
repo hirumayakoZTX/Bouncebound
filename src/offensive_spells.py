@@ -1,7 +1,7 @@
 """Model-only offensive effects; no input, animation, or turn-state transitions.
 
-Distinct action IDs can still commit different spells in the same turn, as in
-Step 2.1. Step 2.5 must claim one main action and attach the full turn lifecycle.
+These low-level APIs do not claim actions. Player input uses World's casting
+entry point, which owns the main action, animation, and shared turn lifecycle.
 """
 
 from collections.abc import Mapping

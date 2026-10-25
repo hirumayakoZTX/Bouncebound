@@ -64,6 +64,7 @@ def get_spell(spell_id: SpellId | str) -> SpellDefinition | None:
 
 
 class SpellFailure(Enum):
+    NO_SELECTION = "No spell selected"
     INVALID_SPELL = "Unknown spell identifier"
     INVALID_STATE = "Spells require an available player aiming action"
     STAGE_LOCKED = "Spell is locked at the current stage"
@@ -176,6 +177,9 @@ class SpellEngine:
         if definition is None:
             raise ValueError(SpellFailure.INVALID_SPELL.value)
         return self._next_ready_turn.get(definition.spell_id, 1)
+
+    def has_committed_action(self, action_id: str) -> bool:
+        return action_id in self._committed_actions
 
     def reset(self) -> None:
         self._next_ready_turn.clear()

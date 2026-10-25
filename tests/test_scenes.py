@@ -106,7 +106,7 @@ class SceneTests(unittest.TestCase):
             with self.subTest(state=state):
                 game = self.game_in_state(state)
                 before = deepcopy(vars(game.world))
-                keys = (pygame.K_SPACE, pygame.K_1)
+                keys = (pygame.K_SPACE, pygame.K_1) if state is not GameState.PLAYER_AIM else ()
                 if state not in (GameState.GAME_OVER, GameState.STAGE_CLEAR):
                     keys += (pygame.K_r,)
                 for key in keys:
