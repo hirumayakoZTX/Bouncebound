@@ -13,8 +13,9 @@ Ultros, Typhon, Chichu, Odin, final Victory and Results, stage progression, defe
 - A desktop display on macOS or Windows.
 
 The application uses a 960 × 576 window with a 60 FPS cap, Pygame's bundled
-default font, procedural colors, and silence.
-No external images, sounds, asset folders, or online services are needed to run.
+default font, a small set of original pixel placeholders, procedural fallbacks,
+and silence. Optional artwork may be absent without preventing play. No external
+image downloads, sound files, audio device, or online services are required.
 
 ## Install and run
 
@@ -246,6 +247,76 @@ the arena. Simultaneous wall-corner contacts reverse both velocity components.
 Physics uses 1/120-second steps, capped at 30 steps per frame. Frame time above
 0.25 seconds is discarded to bound work during stalls, so simulation slows under
 severe stalls instead of accumulating a catch-up backlog.
+
+## Assets and pixel rendering
+
+The optional presentation resources live below `assets/`. Paths come from the
+module's project location, so launching from a different working directory does
+not change where resources are found.
+
+```text
+assets/
+  CREDITS.md                     Provenance and license details
+  generate_placeholders.py       Editable source maps and offline PNG generator
+  images/
+    player/guardian.png          Original 16×16 Kite Guardian
+    enemies/slime.png            Original 16×16 Moss Slime
+    enemies/bomb.png             Original 16×16 Ember Capsule
+    ui/bp_crystal.png            Original 16×16 Blue BP Shard
+    projectiles/orb.png          Original 16×16 Amber Orb
+  sounds/README.md               Optional audio conventions; no sound files
+```
+
+These five original, AI-assisted pixel-map placeholders demonstrate the resource
+loader. They are not final artwork or copied game-client sprites. Their editable
+maps, creator/provenance information, and GPL v3 distribution terms are recorded
+in [assets/CREDITS.md](assets/CREDITS.md). No third-party art, font, or audio was
+added. Additional enemy and boss artwork is not required; those actors retain
+colored procedural shapes, identity labels, and current HP.
+
+`AssetManager` in `src/assets.py` caches image sources, scaled variants, failures,
+and optional sound handles. PNG and BMP are supported by the installed Pygame;
+additional formats depend on its SDL_image codecs. The renderer preloads the
+five known images once. It never reopens them on every frame. Missing, corrupt,
+unreadable, or wrong-size images use cached fallbacks and produce at most one
+warning per resource until an explicit cache clear. The manager supplies a
+crossed placeholder; the game renderer uses its original entity-specific shapes
+instead, preserving identification and HP feedback. An empty asset root remains
+fully playable.
+
+Every image has an explicit native size in `SpriteSpec`. Pixel images use only
+`pygame.transform.scale` with positive integer factors: 16×16 player/enemy art
+is 3× (48×48), an unobstructed crystal is 2× (32×32), an occupied-cell crystal
+marker is 1× (16×16), and the orb is 1× (16×16 including transparent margins).
+Sprites are centered on snapshot positions; they do not change collision bounds,
+orb radius, grid alignment, aim, speed, or damage. Existing font fitting remains
+separate from sprite scaling. No smoothing is applied to pixel art.
+
+To replace a sprite safely:
+
+1. Use an original or appropriately licensed PNG, with transparency where useful.
+   Record actual external sources, license terms, and modifications in the credits.
+2. Keep the declared native dimensions and filename to replace an existing image.
+   To use 32×32 art, explicitly update the relevant `SpriteSpec.native_size` and
+   integer scale in `src/renderer.py`; 32×32 at 1× leaves a centered cell margin.
+   Do not resize physics or collision bounds to match a visual.
+3. Restart the application, or call `renderer.assets.clear_cache()` when explicitly
+   reloading resources. Cached surfaces are shared; copy them before editing.
+
+A custom `AssetManager(root=...)` can supply an empty or alternate resource folder
+for testing without modifying shipped files. Names passed to the loader must be
+relative to that root; absolute paths and traversal outside it are rejected.
+Invalid path/size/scale arguments are configuration errors, rather than missing
+resource fallbacks.
+
+Audio is **disabled by default** and no gameplay audio cues are wired yet.
+`AssetManager(audio_enabled=True).load_sound("sounds/shoot.wav")` provides the
+minimal optional sound contract. The mixer initializes only when explicitly
+requesting an existing sound. Missing/corrupt files, unavailable hardware, or
+playback after device loss safely become silence. Failed device initialization
+is not retried every frame; `clear_cache()` permits an explicit retry. Sound
+handles support `play`, `stop`, `fadeout`, and `set_volume`. No assets are fetched
+from the internet, and the normal game loop never requires an audio device.
 
 ## Verify
 
@@ -504,7 +575,8 @@ src/
   entities.py           Grid enemies, statistics, crystals, and snapshots
   enemy_abilities.py    Deterministic enemy attacks, statuses, hazards, and Odin cycle
   game.py               Window, loop, events, and shutdown
-  renderer.py           Asset-free scene display
+  renderer.py           Cached sprites, procedural fallbacks, and existing HUD
+  assets.py             Optional image/sound loading, pixel scaling, and caches
   states.py             Shared scene and turn-phase names
   turns.py              Stable enemy action, movement, and contact resolution
   world.py              Authoritative run, input, projectile, and scene controller
@@ -516,7 +588,7 @@ src/
   statuses.py           Immutable statuses, timing, and processing events
   status_runtime.py     Ordered hazard, periodic damage, and countdown resolution
   hazards.py            Validated row-based PoisonTiles and refresh/expiry
-assets/                 Asset directory (.gitkeep only; no assets required)
+assets/                 Original pixel placeholders, editable maps, credits, optional sounds
 config/
   prototype.py          Compatible export of the provisional JSON encounter
   stages/
@@ -554,6 +626,8 @@ tests/
   test_support*.py       Healing, cleansing, grants, and shared commit history
   test_status*.py        Status data, runtime timing, and application integration
   test_hazards.py        Floor placement, duration, and defensive precedence
+  test_assets.py         Loading, caches, pixel scaling, failures, and safe audio
+  test_asset_rendering.py  Placement, read-only fallbacks, and complete campaign rendering
 ```
 
-Scoring, persistence, final artwork, and audio are not available.
+Scoring, persistence, final artwork, and automatic gameplay audio cues are not available.

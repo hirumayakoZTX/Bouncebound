@@ -4,6 +4,9 @@ from copy import deepcopy
 from dataclasses import FrozenInstanceError
 import os
 import unittest
+import tempfile
+
+from src.assets import AssetManager
 from unittest.mock import Mock, patch
 
 os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -147,7 +150,9 @@ class ShootingTests(unittest.TestCase):
         pygame.display.init()
         pygame.font.init()
         screen = pygame.display.set_mode(LOGICAL_SIZE)
-        renderer = Renderer()
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        renderer = Renderer(AssetManager(root=directory.name))
         self.fire()
         self.world.advance_time(0.1)
         for pause in (False, True):
