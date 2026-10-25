@@ -216,9 +216,16 @@ on escape. Bosses and ordinary enemies use the same collision, spell, Bomb,
 Ward, and Reraise systems.
 
 Poison and newly placed tiles first damage on the phase after application.
-Poison deals 3 per eligible phase; tiles deal 5 on their affected row for two
-eligible phases, even when unoccupied or blocked by Levitation. Reapplication
-refreshes one record instead of stacking. Refresh during an enemy ability
+Poison deals 3 per eligible phase.
+
+PoisonTiles remain active for two eligible enemy phases after their application
+phase. Their duration decreases during each eligible phase regardless of whether
+the player occupies the affected row or is protected by Levitation. A tile deals
+5 damage only when the player occupies that row and is not protected by
+Levitation. Ward can block one otherwise eligible damage event. Refreshing a tile
+does not stack additional tiles.
+
+Reapplication refreshes one record instead of stacking. Refresh during an enemy ability
 preserves an already-earned tick and retains the refreshed duration. Bind blocks
 movement through the next player action, but permits aiming and shooting.
 Esuna removes Poison and Bind; it does not remove a tile. Levitation blocks tile
