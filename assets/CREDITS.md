@@ -27,6 +27,43 @@ source URL, redistribution license, modifications, and required attribution here
 before distributing it. An online image or audio file is not automatically free
 to reuse. This table does not grant rights to third-party replacement files.
 
+## Original enemy and boss roster
+
+These 13 additional sprites are original AI-assisted pixel-map designs created
+for Bouncebound. They use simplified creature silhouettes, the existing dark
+outline, and a shared limited palette. No FFXIV client assets, traced sprites,
+external image references, downloaded artwork, or external fonts were used.
+The gameplay names identify the actors; these drawings are original project
+interpretations rather than reproductions of their FFXIV appearance.
+
+For every entry below: creator is **Bouncebound project (AI-assisted pixel-map
+design)**; external source URL is **not applicable (original project asset)**;
+license is **GNU GPL v3**, see repository `LICENSE`; modifications are **generated
+from the supplied editable map, nearest-neighbor 3× scaling at runtime**;
+attribution requirements are **GPL v3 redistribution conditions, no extra terms**.
+
+| Asset title | Category | File |
+|---|---|---|
+| Violet Tide — Ultros | Stage 1 boss | `images/enemies/ultros.png` |
+| Gale Puffer — Typhon | Stage 1 boss | `images/enemies/typhon.png` |
+| Forked Cactus — Cactuar | Stage 2 enemy | `images/enemies/cactuar.png` |
+| Mossjaw — Alligator | Stage 2 enemy | `images/enemies/alligator.png` |
+| Dusk Blossom — Bulb | Stage 2 enemy | `images/enemies/bulb.png` |
+| Toothgarden — Morbol | Stage 2 enemy | `images/enemies/morbol.png` |
+| Ember Trap — Landtrap | Stage 2 enemy | `images/enemies/landtrap.png` |
+| Sunseed Beast — Chichu | Stage 2 boss | `images/enemies/chichu.png` |
+| Lantern Root — Mandragora | Stage 3 enemy | `images/enemies/mandragora.png` |
+| Glassback Mite — Diremite | Stage 3 enemy | `images/enemies/diremite.png` |
+| Hooded Watcher — Tonberry | Stage 3 enemy | `images/enemies/tonberry.png` |
+| Violet Coil — Gorgon | Stage 3 enemy | `images/enemies/gorgon.png` |
+| Iron Dusk — Odin | Stage 3 boss | `images/enemies/odin.png` |
+
+Editable maps and the palette are in [generate_enemies.py](generate_enemies.py).
+Every PNG is 16 × 16 RGBA with binary transparency and no antialiasing. Rebuild
+only these 13 PNGs offline using `.venv/bin/python -B assets/generate_enemies.py`.
+The script needs only Pygame and initializes neither display nor audio.
+The five original representative sprites and all audio resources are unchanged.
+
 ## Original feedback tones
 
 The eight WAVs below are original AI-assisted mathematical tone designs created

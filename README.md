@@ -13,7 +13,7 @@ Ultros, Typhon, Chichu, Odin, final Victory and Results, stage progression, defe
 - A desktop display on macOS or Windows.
 
 The application uses a 960 × 576 window with a 60 FPS cap, Pygame's bundled
-default font, a small set of original pixel placeholders, procedural fallbacks,
+default font, original pixel sprites for every enemy and boss, procedural fallbacks,
 and silent-by-default optional cues. Optional artwork may be absent without preventing play. No external
 image downloads, sound files, audio device, or online services are required.
 
@@ -54,7 +54,7 @@ By default, audio hardware is not initialized or required.
 - **Enter** at the menu starts a fresh run and shows the stage introduction.
 - **I** at the menu opens Instructions. **Left / Right** (or **Page Up / Page Down**)
   changes its two pages; **Escape / Backspace** returns to the menu without starting a run.
-- **Enter** at the introduction opens the placeholder battlefield.
+- **Enter** at the introduction opens the battlefield.
 - **W / Up Arrow** and **S / Down Arrow** move one row up and down while aiming.
 - **Move the mouse inside the arena** to preview the initial firing direction.
 - **Left-click inside the arena** to fire the current BP number of orbs as one volley.
@@ -394,28 +394,37 @@ not change where resources are found.
 assets/
   CREDITS.md                     Provenance and license details
   generate_placeholders.py       Editable source maps and offline PNG generator
+  generate_enemies.py            Editable maps for 13 additional enemies/bosses
   generate_cues.py               Editable original tone generator
   images/
     player/guardian.png          Original 16×16 Kite Guardian
     enemies/slime.png            Original 16×16 Moss Slime
     enemies/bomb.png             Original 16×16 Ember Capsule
+    enemies/*.png                13 original 16×16 enemy and boss sprites
     ui/bp_crystal.png            Original 16×16 Blue BP Shard
     projectiles/orb.png          Original 16×16 Amber Orb
   sounds/README.md               Optional audio conventions
   sounds/*.wav                  Eight original opt-in feedback tones
 ```
 
-These five original, AI-assisted pixel-map placeholders demonstrate the resource
-loader. They are not final artwork or copied game-client sprites. Their editable
-maps, creator/provenance information, and GPL v3 distribution terms are recorded
-in [assets/CREDITS.md](assets/CREDITS.md). No third-party art, font, or audio was
-added. Additional enemy and boss artwork is not required; those actors retain
-colored procedural shapes, identity labels, and current HP.
+The original guardian, Slime, Bomb, crystal, and orb are joined by sprites for
+Ultros, Typhon, Cactuar, Alligator, Bulb, Morbol, Landtrap, Chichu, Mandragora,
+Diremite, Tonberry, Gorgon, and Odin. All 15 enemy/boss kinds now have original
+16×16 pixel art, drawn at 48×48 with their identity and HP labels retained.
+The designs use limited palettes, dark outlines, and binary transparency rather
+than smoothed textures. They are original AI-assisted project interpretations,
+not copied game-client sprites. Editable maps, provenance, and GPL v3 terms are
+recorded in [assets/CREDITS.md](assets/CREDITS.md). No external artwork was added.
+Rebuild the 13 additional sprites offline with
+`.venv/bin/python -B assets/generate_enemies.py`; the five initial images still
+use `assets/generate_placeholders.py`. Both generators work without a display
+or audio device. Missing artwork retains colored procedural shapes, identity
+labels, and current HP; no optional sprite is required to play.
 
 `AssetManager` in `src/assets.py` caches image sources, scaled variants, failures,
 and optional sound handles. PNG and BMP are supported by the installed Pygame;
 additional formats depend on its SDL_image codecs. The renderer preloads the
-five known images once. It never reopens them on every frame. Missing, corrupt,
+18 known images once. It never reopens them on every frame. Missing, corrupt,
 unreadable, or wrong-size images use cached fallbacks and produce at most one
 warning per resource until an explicit cache clear. The manager supplies a
 crossed placeholder; the game renderer uses its original entity-specific shapes
@@ -729,7 +738,7 @@ src/
   statuses.py           Immutable statuses, timing, and processing events
   status_runtime.py     Ordered hazard, periodic damage, and countdown resolution
   hazards.py            Validated row-based PoisonTiles and refresh/expiry
-assets/                 Original pixel placeholders, editable maps, credits, optional sounds
+assets/                 Original pixel art, editable maps, credits, optional sounds
 config/
   prototype.py          Compatible export of the provisional JSON encounter
   stages/

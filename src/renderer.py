@@ -26,6 +26,19 @@ PLAYER_SPRITE = SpriteSpec("images/player/guardian.png")
 ENEMY_SPRITES = {
     EnemyType.BASIC: SpriteSpec("images/enemies/slime.png"),
     EnemyType.BOMB: SpriteSpec("images/enemies/bomb.png"),
+    EnemyType.ULTROS: SpriteSpec("images/enemies/ultros.png"),
+    EnemyType.TYPHON: SpriteSpec("images/enemies/typhon.png"),
+    EnemyType.CACTUAR: SpriteSpec("images/enemies/cactuar.png"),
+    EnemyType.ALLIGATOR: SpriteSpec("images/enemies/alligator.png"),
+    EnemyType.BULB: SpriteSpec("images/enemies/bulb.png"),
+    EnemyType.MORBOL: SpriteSpec("images/enemies/morbol.png"),
+    EnemyType.LANDTRAP: SpriteSpec("images/enemies/landtrap.png"),
+    EnemyType.CHICHU: SpriteSpec("images/enemies/chichu.png"),
+    EnemyType.MANDRAGORA: SpriteSpec("images/enemies/mandragora.png"),
+    EnemyType.DIREMITE: SpriteSpec("images/enemies/diremite.png"),
+    EnemyType.TONBERRY: SpriteSpec("images/enemies/tonberry.png"),
+    EnemyType.GORGON: SpriteSpec("images/enemies/gorgon.png"),
+    EnemyType.ODIN: SpriteSpec("images/enemies/odin.png"),
 }
 CRYSTAL_SPRITE = SpriteSpec("images/ui/bp_crystal.png", scale=2)
 ORB_SPRITE = SpriteSpec("images/projectiles/orb.png", scale=1)
@@ -34,8 +47,8 @@ ORB_SPRITE = SpriteSpec("images/projectiles/orb.png", scale=1)
 class Renderer:
     def __init__(self, assets: AssetManager | None = None) -> None:
         self.assets = assets if assets is not None else AssetManager()
-        # Decode known resources once before the first frame. Unknown enemy art
-        # continues to use procedural shapes without probing absent files.
+        # Decode each resource once. Unavailable art retains its procedural
+        # identity and HP label through the cached fallback path.
         for spec in (PLAYER_SPRITE, *ENEMY_SPRITES.values(), CRYSTAL_SPRITE, ORB_SPRITE):
             self.assets.load_image(spec.path, native_size=spec.native_size, scale=spec.scale)
         self.body_font = pygame.font.Font(None, 28)

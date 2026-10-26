@@ -60,7 +60,7 @@ class AssetRenderingTests(unittest.TestCase):
     def test_known_sources_decode_once_and_never_reopen_per_frame(self):
         with patch('src.assets.pygame.image.load',wraps=pygame.image.load) as load:
             renderer=Renderer();w=self.playing();count=load.call_count
-            self.assertEqual(count,5)
+            self.assertEqual(count,3+len(ENEMY_SPRITES))
             for _ in range(15):renderer.draw(self.screen,w.snapshot())
             self.assertEqual(load.call_count,count)
 
@@ -69,8 +69,8 @@ class AssetRenderingTests(unittest.TestCase):
             with patch('src.assets.pygame.image.load',wraps=pygame.image.load) as load:
                 renderer=Renderer(AssetManager(self.empty));w=self.playing()
                 for _ in range(10):renderer.draw(self.screen,w.snapshot())
-                self.assertEqual(load.call_count,5)
-        self.assertEqual(len(messages.output),5)
+                self.assertEqual(load.call_count,3+len(ENEMY_SPRITES))
+        self.assertEqual(len(messages.output),3+len(ENEMY_SPRITES))
 
     def test_sprite_rects_center_on_unchanged_player_grid_enemy_and_orb_coordinates(self):
         renderer=self.renderer();w=self.playing();before=deepcopy(vars(w))
@@ -114,8 +114,9 @@ class AssetRenderingTests(unittest.TestCase):
             renderer.draw(self.screen,snapshot)
             self.assertEqual(vars(w),before);self.assertEqual(w.snapshot(),snapshot)
 
-    def test_unmapped_bosses_keep_procedural_identity_without_disk_probes(self):
-        renderer=self.renderer();w=World(demo=False);w.start_new_run();w.transition_to(GameState.PLAYER_AIM)
+    def test_missing_boss_sprites_keep_procedural_identity_without_disk_probes(self):
+        # Boss kinds now have art; an empty optional root exercises the same fallback.
+        renderer=self.renderer(self.empty);w=World(demo=False);w.start_new_run();w.transition_to(GameState.PLAYER_AIM)
         for i,kind in enumerate((EnemyType.ULTROS,EnemyType.TYPHON,EnemyType.CHICHU,EnemyType.ODIN),1):
             w.combat.add_enemy(Enemy(i,kind,i,3))
         with patch('src.assets.pygame.image.load',side_effect=AssertionError('Unexpected disk read')):
