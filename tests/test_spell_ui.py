@@ -164,11 +164,12 @@ class SpellUITests(unittest.TestCase):
         self.assertEqual(snapshot.spell_hud.next_ready_turn, 1)
         renderer = Renderer()
         before = deepcopy(vars(owner))
-        with patch.object(renderer, '_hud_text', wraps=renderer._hud_text) as text:
+        with patch.object(renderer.hud, '_text', wraps=renderer.hud._text) as text:
             renderer.draw(self.screen, snapshot)
         labels = [call.args[1] for call in text.call_args_list]
-        self.assertTrue(any('Pom Ward | MP 30 | Ready turn 1 | Ready' in label for label in labels))
-        self.assertTrue(any('DOOM 5' in label and 'BIND 1' in label and 'RERAISE' in label for label in labels))
+        for label in ('[7] Pom Ward', 'MP 30', 'Ready - Space to cast', 'Cooldown clear',
+                      '! DOOM 5t', '! Bind 1t', '+ Reraise 1-use'):
+            self.assertIn(label, labels)
         self.assertEqual(vars(owner), before)
         with self.assertRaises(FrozenInstanceError):
             snapshot.spell_hud.next_ready_turn = 0
@@ -182,7 +183,7 @@ class SpellUITests(unittest.TestCase):
             if paused:
                 self.key(pygame.K_ESCAPE)
             before = deepcopy(vars(owner))
-            with patch.object(renderer, '_center_text', wraps=renderer._center_text) as text:
+            with patch.object(renderer.hud, '_text', wraps=renderer.hud._text) as text:
                 for _ in range(5):
                     renderer.draw(self.screen, owner.snapshot())
                 self.assertTrue(any('Pom Fire' in call.args[1] for call in text.call_args_list))

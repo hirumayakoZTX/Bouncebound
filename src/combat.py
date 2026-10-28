@@ -7,7 +7,24 @@ from dataclasses import dataclass, field
 from src.collision import Target
 from src.constants import BOMB_DAMAGE, MAX_BP
 from src.entities import Crystal, Enemy, EnemyType, validate_damage, validate_id
-from src.projectile import HitEvent
+from src.projectile import HitEvent, BounceEvent
+
+
+OBSERVATION_LIMIT = 512
+
+
+@dataclass(frozen=True)
+class CombatObservation:
+    """Detached facts for presentation; sequence IDs are scoped to this Combat."""
+
+    sequence: int
+    kind: str
+    entity_id: int
+    position: tuple[float, float]
+    source: str = ""
+    enemy_type: EnemyType | None = None
+    amount: int = 0
+    normal: tuple[float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -47,6 +64,21 @@ class Combat:
     death_events: list[DeathEvent] = field(default_factory=list)
     pending_deaths: deque[DeathEvent] = field(default_factory=deque)
     _processed_deaths: set[int] = field(default_factory=set)
+    _observations: deque[CombatObservation] = field(default_factory=lambda: deque(maxlen=OBSERVATION_LIMIT),
+                                                   init=False, repr=False)
+    _observation_sequence: int = field(default=0, init=False, repr=False)
+
+    @property
+    def observations(self) -> tuple[CombatObservation, ...]:
+        return tuple(self._observations)
+
+    def _observe(self, kind: str, entity_id: int, position: tuple[float, float], **values) -> None:
+        self._observation_sequence += 1
+        self._observations.append(CombatObservation(self._observation_sequence, kind, entity_id,
+                                                    position, **values))
+
+    def observe_bounce(self, event: BounceEvent) -> None:
+        self._observe("bounce", event.projectile_id, event.position, normal=event.normal)
 
     def __post_init__(self) -> None:
         if (any(key != enemy.enemy_id for key, enemy in self.enemies.items())
@@ -75,7 +107,14 @@ class Combat:
 
     def _damage(self, enemy_id: int, amount: int, source: str) -> bool:
         enemy = self.enemies.get(enemy_id)
-        if enemy is None or not enemy.take_damage(amount):
+        if enemy is None:
+            return False
+        before = enemy.hp
+        killed = enemy.take_damage(amount)
+        if enemy.hp < before:
+            self._observe("hit", enemy_id, enemy.position, source=source,
+                          enemy_type=enemy.enemy_type, amount=before - enemy.hp)
+        if not killed:
             return False
         self.pending_deaths.append(DeathEvent(enemy_id, enemy.enemy_type, source))
         return True
@@ -122,6 +161,8 @@ class Combat:
                 continue
             self._processed_deaths.add(event.enemy_id)
             self.death_events.append(event)
+            self._observe("death", event.enemy_id, self.enemies[event.enemy_id].position,
+                          source=event.source, enemy_type=event.enemy_type)
             if event.enemy_type is not EnemyType.BOMB:
                 continue
             bomb = self.enemies[event.enemy_id]
@@ -138,6 +179,7 @@ class Combat:
         elif event.target_id in self.crystals:
             if self.crystals[event.target_id].collect():
                 self.pending_bp += 1
+                self._observe("crystal", event.target_id, event.position)
 
     def finish_shot(self, bp: int) -> int:
         self.resolve_deaths()

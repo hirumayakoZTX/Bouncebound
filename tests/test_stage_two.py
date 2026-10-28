@@ -295,6 +295,7 @@ class StageTwoCampaignTests(unittest.TestCase):
             def __init__(self,font):self.font=font
             def render(self,text,*args):texts.append(text);return self.font.render(text,*args)
         renderer.body_font=RecordingFont(renderer.body_font)
+        renderer.hud_font=RecordingFont(renderer.hud_font)
         before=deepcopy(vars(world));snapshot=world.snapshot()
         for _ in range(3):renderer.draw(screen,snapshot)
         self.assertEqual(vars(world),before);self.assertEqual(world.snapshot(),snapshot)

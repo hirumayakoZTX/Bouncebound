@@ -13,8 +13,9 @@ Ultros, Typhon, Chichu, Odin, final Victory and Results, stage progression, defe
 - A desktop display on macOS or Windows.
 
 The application uses a 960 × 576 window with a 60 FPS cap, Pygame's bundled
-default font, procedural colors, and silence.
-No external images, sounds, asset folders, or online services are needed to run.
+default font, original pixel sprites for every enemy and boss, procedural fallbacks,
+and silent-by-default optional cues. Optional artwork may be absent without preventing play. No external
+image downloads, sound files, audio device, or online services are required.
 
 ## Install and run
 
@@ -46,12 +47,14 @@ If PowerShell blocks activation, use `.\.venv\Scripts\python.exe` directly in
 place of `python` for installation, execution, and tests.
 
 A window titled **Bouncebound: Familiar Defense** opens at the main menu.
-Audio hardware is not initialized or required.
+By default, audio hardware is not initialized or required.
 
 ## Controls and current functionality
 
 - **Enter** at the menu starts a fresh run and shows the stage introduction.
-- **Enter** at the introduction opens the placeholder battlefield.
+- **I** at the menu opens Instructions. **Left / Right** (or **Page Up / Page Down**)
+  changes its two pages; **Escape / Backspace** returns to the menu without starting a run.
+- **Enter** at the introduction opens the battlefield.
 - **W / Up Arrow** and **S / Down Arrow** move one row up and down while aiming.
 - **Move the mouse inside the arena** to preview the initial firing direction.
 - **Left-click inside the arena** to fire the current BP number of orbs as one volley.
@@ -246,6 +249,221 @@ the arena. Simultaneous wall-corner contacts reverse both velocity components.
 Physics uses 1/120-second steps, capped at 30 steps per frame. Frame time above
 0.25 seconds is discarded to bound work during stalls, so simulation slows under
 severe stalls instead of accumulating a catch-up backlog.
+
+## Combat HUD
+
+The combat interface keeps the 960 × 576 canvas and fixed battlefield. Resource
+panels sit above the arena; effects, selected-spell details, feedback, and compact
+spell shortcuts sit below it. No panel covers the battlefield or player lane.
+
+- **HP** shows current/max health and a health bar. Low health also uses a warning
+  color; the numeric value stays visible after damage, healing, and revival.
+- **MP** shows current/max mana and a mana bar. It changes only through existing
+  spell payments; rejected casts are free and MP does not regenerate passively.
+- **BP** shows current/max BP and five volley pips. Filled pips are available for
+  the next shot. Outlined amber pips and `+N pending` mark collected rewards that
+  have not settled yet. BP is not ammunition and is not consumed by shooting.
+- **Stage / Turn / Waves** report the current encounter. Boss progress is shown
+  separately as pending or the number still alive; bosses do not add scripted waves.
+- **Selected spell** shows its number key, name, MP cost, and actual availability.
+  A cooldown displays the absolute ready turn and turns remaining. Other failures
+  explain MP, targeting, full-HP Cure, or used Reraise restrictions. Animations and
+  pause explicitly mark actions unavailable. Shortcut tags `S2` and `S3` indicate
+  stage locks; selecting a locked spell leaves the current selection unchanged.
+- **Effects** use `!` for harmful and `+` for beneficial effects. `Nt` is the model's
+  remaining effective turns, not seconds. Doom shows its countdown; Reraise shows
+  `1-use` without a fabricated duration. Consumed or expired effects disappear
+  when the model removes them. Tile information shows the number of PoisonTiles
+  and, when applicable, the current row's duration and Levitation protection.
+- **Feedback** preserves the latest selection or cast message until replaced by
+  the model. It does not independently time out or generate combat events.
+  Movement/aiming/selection remain free; one successful shot or spell uses the action.
+- **Score: —** reserves space for a future score display. Scoring and persistence
+  are not implemented; the dash is not an earned score of zero.
+
+The HUD uses bundled Pygame fonts and procedural panels, so it works with an empty
+optional asset directory and needs no audio device. Sprite caching and procedural
+fallbacks remain active. Long future feedback is wrapped and, if necessary,
+ellipsized rather than scaled into tiny text. Combat information remains visible
+above the pause overlay.
+
+## Menus, field guide, and end screens
+
+The menu, stage introductions, pause overlay, and end screens share dark panels,
+pixel borders, high-contrast text, and restrained color accents. The menu's hints
+are keyboard commands: Enter starts, I opens Instructions, and Escape quits.
+They are not mouse buttons. Instructions use two pages of compact sections for
+movement, turns, BP, spells and unlocks, statuses, progression, pause, and restart.
+Viewing or paging the guide does not start an encounter or change resources.
+
+Each stage introduction names the stage and its final encounter: Ultros and
+Typhon, Chichu, then Odin. It also shows the configured wave count and unlocked
+spells. Enter continues; the first wave appears when gameplay begins. Held-key
+repeat events cannot skip introductions, flip help pages, or toggle pause.
+
+Escape during gameplay opens a translucent pause panel with control reminders.
+The battlefield stays recognizable and the combat HUD remains legible. Aiming,
+projectiles, spell time, pending actions, statuses, hazards, and enemy actions stay
+frozen. Escape resumes the exact previous phase without charging the paused
+frame's elapsed time.
+
+Stage Clear shows the cleared stage, turn, HP, MP, and BP. Enter: Next Stage is
+shown only when advancement is authorized and the next stage exists. Game Over
+shows the actual failure reason: depleted HP or a required enemy escaping the
+defense line. Defense failure can occur with positive HP and never offers stage
+advancement. Both screens offer R: Restart Run.
+
+The third stage ends in Victory. Enter opens Results with the final stage, turn,
+and remaining resources. Its `Score: —` placeholder is unavailable data, not a
+numerical score; no kill totals, bonuses, records, or save files are fabricated.
+R from Stage Clear, Game Over, Victory, or Results returns to a fresh Stage 1
+Intro through the full campaign reset. R does not restart active gameplay.
+
+All screens work without optional artwork or an audio device. The menu uses the
+original guardian sprite when available and a procedural crest otherwise.
+Missing or corrupt images use cached fallbacks; no online resources are needed.
+To check navigation, press I at the menu, Right, Left, and Backspace; then start
+with Enter. During play, pause/resume while aiming and during a shot or spell.
+Use the complete campaign routes below to check introductions, Stage Clear,
+Victory, Results, and restart.
+
+## Combat feedback and optional audio
+
+Shots now show a brief launch burst and actual volley count. Each authoritative
+orb leaves up to six small sampled afterimages, with distinct colors for a BP
+volley. Wall contacts show short sparks; real enemy HP loss shows an impact
+outline and a floating number. Numbers report actual HP lost, clamped at zero,
+so overkill does not fabricate additional damage. Defeated enemies dissolve into
+small marks; bosses receive a larger burst. Escapes are not rendered as deaths.
+Bomb deaths show an orange burst and neighboring-cell outlines. These indicators
+represent enemy explosion damage; they do not harm or collect blue crystals.
+
+Aiming remains an accurate **straight initial direction**: origin ring, arrow,
+line, and target marker. It moves with the player and clears for invalid aims.
+It does not predict reflected paths or promise a hit. During pause, a valid aim
+is frozen under the overlay; shooting and spell animations hide the preview.
+
+All eight spells use their committed results: Fire traces its actual target,
+Starstorm outlines its real radius-96 area, Meteor marks its selected enemies,
+Cure shows actual healing, Esuna reports the number of removed statuses,
+Levitation uses floor/lift markers, Ward uses a shield, and Reraise uses a halo.
+Actual Ward blocks, Levitation floor protection, player damage, Poison/Doom
+warnings, Tonberry Enrage, and Reraise activation have distinct compact feedback.
+A failed cast produces no successful-cast effect. Feedback never spends resources,
+applies damage, advances a turn, or decides victory.
+
+Transient effects use a bounded pool and finite lifetimes. They freeze during
+pause, discard paused elapsed time on resume, and clear on stage transitions,
+restart, and shutdown. They never keep a dead enemy in collision targets or delay
+Stage Clear. No camera shake, intense full-screen flash, or music is used.
+For fewer moving visual elements, launch with:
+
+```bash
+python main.py --no-effects
+```
+
+The HUD, screens, entity sprites/fallbacks, accurate aim guide, and full campaign
+remain available. Sound is independent of this switch and **off by default**.
+Eight small original tones are included. Opt in explicitly with:
+
+```bash
+python main.py --audio
+```
+
+Sound cues follow already-resolved shoot, bounce, enemy hit/death, spell,
+player-damage, victory, and defeat events. Resources load lazily and are cached;
+repeated drawing cannot replay cues. Pause stops outstanding short cues without
+replaying them on resume. Missing/corrupt WAVs, mixer failures, and device loss
+produce silence while gameplay continues. The cue set and simultaneous playback
+are bounded, so very dense bursts may drop presentation voices. Physical audio
+output depends on the local device. Use both flags together for sound with no
+transient visual effects.
+
+The original WAVs can be regenerated offline with
+`python -B assets/generate_cues.py`. They use no external recordings; provenance
+and license details are in [assets/CREDITS.md](assets/CREDITS.md). Empty optional
+asset folders remain supported for the entire campaign.
+
+## Assets and pixel rendering
+
+The optional presentation resources live below `assets/`. Paths come from the
+module's project location, so launching from a different working directory does
+not change where resources are found.
+
+```text
+assets/
+  CREDITS.md                     Provenance and license details
+  generate_placeholders.py       Editable source maps and offline PNG generator
+  generate_enemies.py            Editable maps for 13 additional enemies/bosses
+  generate_cues.py               Editable original tone generator
+  images/
+    player/guardian.png          Original 16×16 Kite Guardian
+    enemies/slime.png            Original 16×16 Moss Slime
+    enemies/bomb.png             Original 16×16 Ember Capsule
+    enemies/*.png                13 original 16×16 enemy and boss sprites
+    ui/bp_crystal.png            Original 16×16 Blue BP Shard
+    projectiles/orb.png          Original 16×16 Amber Orb
+  sounds/README.md               Optional audio conventions
+  sounds/*.wav                  Eight original opt-in feedback tones
+```
+
+The original guardian, Slime, Bomb, crystal, and orb are joined by sprites for
+Ultros, Typhon, Cactuar, Alligator, Bulb, Morbol, Landtrap, Chichu, Mandragora,
+Diremite, Tonberry, Gorgon, and Odin. All 15 enemy/boss kinds now have original
+16×16 pixel art, drawn at 48×48 with their identity and HP labels retained.
+The designs use limited palettes, dark outlines, and binary transparency rather
+than smoothed textures. They are original AI-assisted project interpretations,
+not copied game-client sprites. Editable maps, provenance, and GPL v3 terms are
+recorded in [assets/CREDITS.md](assets/CREDITS.md). No external artwork was added.
+Rebuild the 13 additional sprites offline with
+`.venv/bin/python -B assets/generate_enemies.py`; the five initial images still
+use `assets/generate_placeholders.py`. Both generators work without a display
+or audio device. Missing artwork retains colored procedural shapes, identity
+labels, and current HP; no optional sprite is required to play.
+
+`AssetManager` in `src/assets.py` caches image sources, scaled variants, failures,
+and optional sound handles. PNG and BMP are supported by the installed Pygame;
+additional formats depend on its SDL_image codecs. The renderer preloads the
+18 known images once. It never reopens them on every frame. Missing, corrupt,
+unreadable, or wrong-size images use cached fallbacks and produce at most one
+warning per resource until an explicit cache clear. The manager supplies a
+crossed placeholder; the game renderer uses its original entity-specific shapes
+instead, preserving identification and HP feedback. An empty asset root remains
+fully playable.
+
+Every image has an explicit native size in `SpriteSpec`. Pixel images use only
+`pygame.transform.scale` with positive integer factors: 16×16 player/enemy art
+is 3× (48×48), an unobstructed crystal is 2× (32×32), an occupied-cell crystal
+marker is 1× (16×16), and the orb is 1× (16×16 including transparent margins).
+Sprites are centered on snapshot positions; they do not change collision bounds,
+orb radius, grid alignment, aim, speed, or damage. Existing font fitting remains
+separate from sprite scaling. No smoothing is applied to pixel art.
+
+To replace a sprite safely:
+
+1. Use an original or appropriately licensed PNG, with transparency where useful.
+   Record actual external sources, license terms, and modifications in the credits.
+2. Keep the declared native dimensions and filename to replace an existing image.
+   To use 32×32 art, explicitly update the relevant `SpriteSpec.native_size` and
+   integer scale in `src/renderer.py`; 32×32 at 1× leaves a centered cell margin.
+   Do not resize physics or collision bounds to match a visual.
+3. Restart the application, or call `renderer.assets.clear_cache()` when explicitly
+   reloading resources. Cached surfaces are shared; copy them before editing.
+
+A custom `AssetManager(root=...)` can supply an empty or alternate resource folder
+for testing without modifying shipped files. Names passed to the loader must be
+relative to that root; absolute paths and traversal outside it are rejected.
+Invalid path/size/scale arguments are configuration errors, rather than missing
+resource fallbacks.
+
+Audio is **disabled by default**. `python main.py --audio` enables the optional
+cue router; `AssetManager(audio_enabled=True).load_sound("sounds/shoot.wav")`
+remains available for custom presentation code. The mixer initializes only when
+requesting an existing sound. Missing/corrupt files, unavailable hardware, or
+playback after device loss safely become silence. Failed device initialization
+is not retried every frame; `clear_cache()` permits an explicit retry. Sound
+handles support `play`, `stop`, `fadeout`, and `set_volume`. No assets are fetched
+from the internet, and the game never requires an audio device.
 
 ## Verify
 
@@ -504,7 +722,11 @@ src/
   entities.py           Grid enemies, statistics, crystals, and snapshots
   enemy_abilities.py    Deterministic enemy attacks, statuses, hazards, and Odin cycle
   game.py               Window, loop, events, and shutdown
-  renderer.py           Asset-free scene display
+  renderer.py           Battlefield, sprite, HUD, screen, and feedback coordination
+  effects.py            Bounded visual effects, trails, and optional event-driven cues
+  screens.py            Read-only menus, field guide, intros, pause, and end screens
+  hud.py                Read-only combat panels, resource bars, spell/status feedback
+  assets.py             Optional image/sound loading, pixel scaling, and caches
   states.py             Shared scene and turn-phase names
   turns.py              Stable enemy action, movement, and contact resolution
   world.py              Authoritative run, input, projectile, and scene controller
@@ -516,7 +738,7 @@ src/
   statuses.py           Immutable statuses, timing, and processing events
   status_runtime.py     Ordered hazard, periodic damage, and countdown resolution
   hazards.py            Validated row-based PoisonTiles and refresh/expiry
-assets/                 Asset directory (.gitkeep only; no assets required)
+assets/                 Original pixel art, editable maps, credits, optional sounds
 config/
   prototype.py          Compatible export of the provisional JSON encounter
   stages/
@@ -531,6 +753,8 @@ tests/
   test_encounter_integration.py  End screens, input, and repeatable application runs
   test_world.py         Deterministic controller and transition tests
   test_scenes.py        Scene input and rendering checks
+  test_screens.py       Screen navigation, help, layouts, pause, caches, campaign determinism
+  test_effects.py       Event facts, lifetimes, deduplication, audio safety, and campaign invariance
   test_player_input.py  Movement and aiming rules
   test_projectile.py    Geometry, ricochets, contact events, and timing
   test_collision_eligibility.py  Surface-contact and penetration regressions
@@ -554,6 +778,9 @@ tests/
   test_support*.py       Healing, cleansing, grants, and shared commit history
   test_status*.py        Status data, runtime timing, and application integration
   test_hazards.py        Floor placement, duration, and defensive precedence
+  test_assets.py         Loading, caches, pixel scaling, failures, and safe audio
+  test_asset_rendering.py  Placement, read-only fallbacks, and complete campaign rendering
+  test_hud.py            Layout, resources, restrictions, statuses, caches, campaign determinism
 ```
 
-Scoring, persistence, final artwork, and audio are not available.
+Scoring, persistence, final artwork, and music are not available.

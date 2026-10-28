@@ -9,11 +9,11 @@ from src.constants import (
     AIM_ORIGIN_OFFSET, BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE,
     GRID_ROWS, INITIAL_PLAYER_ROW, PLAYER_X, TILE_SIZE,
 )
-from src.states import ACTIVE_STATES, GameOverReason, GameState
+from src.states import ACTIVE_STATES, GameOverReason, GameState, INSTRUCTION_PAGE_COUNT
 from src.collision import Target
 from src.projectile import FixedStepPhysics, HitEvent, Projectile, ProjectileSnapshot
 from src.projectile import firing_velocities
-from src.combat import Combat
+from src.combat import Combat, CombatObservation
 from src.demo import create_demo_combat
 from src.encounter import Encounter, EncounterDefinition, EncounterOutcome
 from src.entities import (
@@ -47,7 +47,8 @@ _ACTION_END_STATES = frozenset({
     GameState.GAME_OVER,
 })
 _TRANSITIONS = {
-    GameState.MENU: frozenset({GameState.STAGE_INTRO}),
+    GameState.MENU: frozenset({GameState.STAGE_INTRO, GameState.INSTRUCTIONS}),
+    GameState.INSTRUCTIONS: frozenset({GameState.MENU}),
     GameState.STAGE_INTRO: frozenset({GameState.PLAYER_AIM}),
     GameState.PLAYER_AIM: frozenset({
         GameState.SHOT_ANIMATION, GameState.SPELL_ANIMATION, GameState.GAME_OVER,
@@ -103,6 +104,8 @@ class WorldSnapshot:
     boss_wave_spawned: bool = False
     bosses_remaining: int = 0
     boss_total: int = 0
+    instructions_page: int = 0
+    combat_observations: tuple[CombatObservation, ...] = ()
 
 
 class World:
@@ -167,6 +170,7 @@ class World:
         self.player_row = INITIAL_PLAYER_ROW
         self.aim_target: tuple[float, float] | None = None
         self._state = GameState.MENU
+        self.instructions_page = 0
         self._paused_state: GameState | None = None
         self.projectiles: list[Projectile] = []
         self._physics = FixedStepPhysics()
@@ -302,8 +306,21 @@ class World:
 
         previous_state = self.state
         self._state = target
+        if target in (GameState.MENU, GameState.INSTRUCTIONS):
+            self.instructions_page = 0
         if previous_state is GameState.STAGE_INTRO and target is GameState.PLAYER_AIM:
             self.spawn_waves()
+        return True
+
+    def change_instructions_page(self, delta: int) -> bool:
+        """Navigate help without starting a run or touching gameplay data."""
+        if (self.state is not GameState.INSTRUCTIONS or type(delta) is not int
+                or delta not in (-1, 1)):
+            return False
+        page = self.instructions_page + delta
+        if not 0 <= page < INSTRUCTION_PAGE_COUNT:
+            return False
+        self.instructions_page = page
         return True
 
     def spawn_waves(self) -> tuple[int, ...]:
@@ -396,6 +413,7 @@ class World:
             dt, self.projectiles,
             target_provider=lambda: self.combat.targets() + targets,
             on_hit=self.combat.handle_hit,
+            on_bounce=self.combat.observe_bounce,
         )
         self.projectiles = [orb for orb in self.projectiles if orb.active]
         if not self.projectiles:
@@ -579,6 +597,8 @@ class World:
                if definition is not None else None)
         return WorldSnapshot(
             state=self.state,
+            instructions_page=self.instructions_page,
+            combat_observations=self.combat.observations,
             stage=self.stage,
             turn_index=self.turn_index,
             hp=self.hp,

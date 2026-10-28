@@ -27,6 +27,18 @@ class HitEvent:
     normal: Point
 
 
+@dataclass(frozen=True)
+class BounceEvent:
+    """An already resolved wall contact; never an instruction to reflect."""
+
+    projectile_id: int
+    position: Point
+    normal: Point
+
+
+BounceHandler = Callable[[BounceEvent], None]
+
+
 TargetProvider = Callable[[], tuple[Target, ...]]
 HitHandler = Callable[[HitEvent], None]
 
@@ -139,6 +151,7 @@ class Projectile:
     def step(
         self, dt: float, targets: tuple[Target, ...] = (), *,
         target_provider: TargetProvider | None = None, on_hit: HitHandler | None = None,
+        on_bounce: BounceHandler | None = None,
     ) -> tuple[HitEvent, ...]:
         """Advance a step using swept impacts; inactive orbs are never touched.
 
@@ -198,9 +211,15 @@ class Projectile:
             remaining = max(0.0, remaining - elapsed)
             if entry_time is not None and abs(entry_time - elapsed) <= EPSILON:
                 self.entered_arena = True
+            wall_normals = []
             for contact in walls:
                 if abs(contact.time - elapsed) <= EPSILON:
                     self._reflect(contact.normal)
+                    wall_normals.append(contact.normal)
+            if wall_normals and on_bounce is not None:
+                # One corner contact can contain both reflected wall components.
+                normal = (sum(n[0] for n in wall_normals), sum(n[1] for n in wall_normals))
+                on_bounce(BounceEvent(self.projectile_id, self.position, normal))
             for contact, target in impacts:
                 if abs(contact.time - elapsed) > EPSILON:
                     continue
@@ -247,6 +266,7 @@ class FixedStepPhysics:
     def advance(
         self, dt: float, projectiles: list[Projectile], targets: tuple[Target, ...] = (), *,
         target_provider: TargetProvider | None = None, on_hit: HitHandler | None = None,
+        on_bounce: BounceHandler | None = None,
     ) -> tuple[HitEvent, ...]:
         """Accept at most 0.25 seconds per frame; drop excess time, never backlog it.
 
@@ -265,7 +285,8 @@ class FixedStepPhysics:
         for _ in range(steps):
             for projectile in sorted(projectiles, key=lambda orb: orb.projectile_id):
                 events.extend(projectile.step(PHYSICS_STEP, targets,
-                                               target_provider=target_provider, on_hit=on_hit))
+                                               target_provider=target_provider, on_hit=on_hit,
+                                               on_bounce=on_bounce))
             self.accumulator = max(0.0, self.accumulator - PHYSICS_STEP)
             if not any(projectile.active for projectile in projectiles):
                 self.accumulator = 0.0

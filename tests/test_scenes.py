@@ -3,6 +3,9 @@
 from copy import deepcopy
 import os
 import unittest
+import tempfile
+
+from src.assets import AssetManager
 from unittest.mock import Mock, call, patch
 
 os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -28,6 +31,7 @@ def world_in_state(state: GameState) -> World:
         return world
     paths = {
         GameState.MENU: (),
+        GameState.INSTRUCTIONS: (GameState.INSTRUCTIONS,),
         GameState.STAGE_INTRO: (GameState.STAGE_INTRO,),
         GameState.PLAYER_AIM: (GameState.STAGE_INTRO, GameState.PLAYER_AIM),
     }
@@ -84,6 +88,7 @@ class SceneTests(unittest.TestCase):
 
     def test_escape_is_scene_specific(self) -> None:
         expected = {
+            GameState.INSTRUCTIONS: GameState.MENU,
             GameState.PLAYER_AIM: GameState.PAUSED,
             GameState.SHOT_ANIMATION: GameState.PAUSED,
             GameState.SPELL_ANIMATION: GameState.PAUSED,
@@ -184,7 +189,9 @@ class SceneTests(unittest.TestCase):
         pygame.display.init()
         pygame.font.init()
         screen = pygame.display.set_mode(LOGICAL_SIZE)
-        renderer = Renderer()
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        renderer = Renderer(AssetManager(root=directory.name))
         world = world_in_state(GameState.PLAYER_AIM)
         world.move_player(-1)
         world.set_aim_target((200, 150))

@@ -63,16 +63,16 @@ class EncounterIntegrationTests(unittest.TestCase):
                 world.game_over_reason = reason
                 world.hp = 0 if reason is GameOverReason.HP_DEPLETED else 90
                 before = deepcopy(vars(world))
-                with patch.object(renderer, "_center_text", wraps=renderer._center_text) as draw:
+                with patch.object(renderer.screens, "_text", wraps=renderer.screens._text) as draw:
                     for _ in range(3):
                         renderer.draw(screen, world.snapshot())
                 labels = [call.args[1] for call in draw.call_args_list]
                 self.assertIn("Stage Clear" if state is GameState.STAGE_CLEAR else "Game Over", labels)
                 self.assertIn(text, labels)
-                self.assertIn("Press R to Restart", labels)
+                self.assertIn("R: Restart Run", labels)
                 self.assertIn("Stage 1 | Turn 1", labels)
-                self.assertTrue(any(f"HP {world.hp}/100" in label and "BP 1" in label
-                                    for label in labels))
+                for label in (f"HP {world.hp}/100", "MP 100/100", "BP 1/5"):
+                    self.assertIn(label, labels)
                 self.assertEqual(vars(world), before)
 
     def test_rendering_never_spawns_future_waves_or_claims_pending_actions(self):

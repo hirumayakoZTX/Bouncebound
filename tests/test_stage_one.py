@@ -286,13 +286,15 @@ class CanonicalStageOneTests(unittest.TestCase):
         before = deepcopy(vars(world));snapshot = world.snapshot()
         self.assertTrue(snapshot.boss_wave_spawned)
         self.assertEqual((snapshot.bosses_remaining,snapshot.boss_total), (2,2))
-        with patch.object(renderer,'body_font', wraps=renderer.body_font) as font:
+        # Provided sprites use compact HP plates; missing art uses larger labels.
+        with patch.object(renderer,'body_font', wraps=renderer.body_font) as font, \
+                patch.object(renderer,'hud_font', wraps=renderer.hud_font) as hud_font:
             renderer.draw(screen,snapshot)
-            labels=[call.args[0] for call in font.render.call_args_list]
+            labels=[call.args[0] for call in font.render.call_args_list + hud_font.render.call_args_list]
             self.assertIn('U15',labels);self.assertIn('T15',labels)
         self.assertEqual(vars(world),before)
         perform_action(world,'fire',2);perform_action(world,'starstorm',5);perform_action(world,'shot',5)
-        with patch.object(renderer,'_center_text',wraps=renderer._center_text) as text:
+        with patch.object(renderer.screens,'_text',wraps=renderer.screens._text) as text:
             renderer.draw(screen,world.snapshot())
             labels=[call.args[1] for call in text.call_args_list]
         self.assertIn('Stage 1 encounter complete',labels)
