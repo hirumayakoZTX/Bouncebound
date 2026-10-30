@@ -35,7 +35,7 @@ class CollisionEligibilityTests(unittest.TestCase):
         events = orb.step(PHYSICS_STEP, (self.target,))
         self.assertEqual(len(events), 1)
         self.assertEqual((events[0].projectile_id, events[0].target_id, events[0].damage),
-                         (1, 42, 5))
+                         (1, 42, 4))
         self.assertEqual(events[0].position, (193, 220))
         self.assertEqual(orb.hits, 1)
         self.assertEqual(orb.velocity, (-520, 0))
@@ -47,7 +47,7 @@ class CollisionEligibilityTests(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].position, (193, 220))
         self.assertEqual(events[0].normal, (-1, 0))
-        self.assertEqual(events[0].damage, 5)
+        self.assertEqual(events[0].damage, 4)
         self.assertEqual(orb.hits, 1)
         self.assertEqual(orb.velocity, (-520, 0))
 
@@ -104,7 +104,7 @@ class CollisionEligibilityTests(unittest.TestCase):
         orb = Projectile(1, (190, 193.01), (520, 0))
         events = orb.step(0.04, (self.target,))
         self.assertEqual(len(events), 1)
-        self.assertEqual((events[0].target_id, events[0].damage), (42, 5))
+        self.assertEqual((events[0].target_id, events[0].damage), (42, 4))
         self.assertLess(events[0].normal[0], 0)
         self.assertLess(events[0].normal[1], -0.99)
         self.assertAlmostEqual(hypot(*orb.velocity), 520)
@@ -129,7 +129,7 @@ class CollisionEligibilityTests(unittest.TestCase):
         orb = Projectile(1, (193, 220), (-520, 0))
         events = orb.step(0.4, (self.target,))
         self.assertEqual(len(events), 1)
-        self.assertEqual((events[0].target_id, events[0].damage), (42, 5))
+        self.assertEqual((events[0].target_id, events[0].damage), (42, 4))
         self.assertEqual(orb.hits, 1)
         self.assertEqual(orb.velocity, (-520, 0))
 

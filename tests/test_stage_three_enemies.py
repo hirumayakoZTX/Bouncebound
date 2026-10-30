@@ -28,7 +28,7 @@ class StageThreeEnemyTests(unittest.TestCase):
             self.assertEqual(e.bounds.right-e.bounds.left,48)
             orb=Projectile.launch(1,(e.bounds.right+12,e.position[1]),(-1,0))
             FixedStepPhysics().advance(.05,[orb],target_provider=combat.targets,on_hit=combat.handle_hit)
-            self.assertEqual(e.hp,e.max_hp-5)
+            self.assertEqual(e.hp,e.max_hp-4)
             self.assertEqual(e.enraged,kind=='tonberry')
 
     def test_mandragora_cadence_and_tile_grace_match_bulb(self):
@@ -90,7 +90,7 @@ class StageThreeEnemyTests(unittest.TestCase):
             self.assertEqual(w.enemies[1].hp,8 if spell=='starstorm' else 3)
         target=Enemy(2,EnemyType.TONBERRY,5,3)
         combat=Combat({1:Enemy(1,EnemyType.BOMB,4,3),2:target})
-        combat.apply_damage(1,5)
+        combat.apply_damage(1,10)
         self.assertEqual(target.hp,8);self.assertTrue(target.enraged)
 
     def test_tonberry_retaliates_once_in_next_surviving_phase_and_stays_enraged(self):
@@ -184,7 +184,7 @@ class StageThreeEnemyTests(unittest.TestCase):
                 self.assertEqual(vars(w),after)
             target=Enemy(2,EnemyType(kind),5,3)
             combat=Combat({1:Enemy(1,EnemyType.BOMB,4,3),2:target})
-            combat.add_crystal(Crystal(3,5,3));combat.apply_damage(1,5)
+            combat.add_crystal(Crystal(3,5,3));combat.apply_damage(1,10)
             self.assertEqual(target.hp,max(0,target.max_hp-10))
             self.assertFalse(combat.crystals[3].collected)
 

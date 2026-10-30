@@ -18,7 +18,7 @@ class ProjectileTests(unittest.TestCase):
                 self.assertAlmostEqual(hypot(*orb.velocity), 520)
                 self.assertLess(orb.velocity[0], 0)
                 self.assertEqual((orb.radius, orb.damage, orb.max_hits, orb.max_lifetime),
-                                 (7, 5, 12, 5))
+                                 (7, 4, 12, 5))
                 self.assertFalse(orb.entered_arena)
 
     def test_invalid_launch_directions_are_rejected(self) -> None:
@@ -103,7 +103,7 @@ class ProjectileTests(unittest.TestCase):
         events = orb.step(0.2, (target,))
         self.assertEqual(len(events), 1)
         hit = events[0]
-        self.assertEqual((hit.projectile_id, hit.target_id, hit.damage), (4, 8, 5))
+        self.assertEqual((hit.projectile_id, hit.target_id, hit.damage), (4, 8, 4))
         self.assertEqual(hit.normal, (-1, 0))
         self.assertEqual(hit.position, (243, 200))
         self.assertAlmostEqual(orb.position[0], 182)

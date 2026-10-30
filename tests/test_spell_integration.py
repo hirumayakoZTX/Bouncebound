@@ -117,7 +117,7 @@ class SpellIntegrationTests(unittest.TestCase):
     def test_stage_clear_restart_clears_model_only_payment_history(self) -> None:
         world = self.game.world
         self.assertTrue(world.commit_spell("model-only", "ward").valid)
-        for row in (3, 3, 2, 2, 4, 4, 3):
+        for row in (3, 3, 2, 2, 4, 3):
             while world.player_row != row:
                 world.move_player(1 if world.player_row < row else -1)
             world.set_aim_target((96, 96 + 48 * row))

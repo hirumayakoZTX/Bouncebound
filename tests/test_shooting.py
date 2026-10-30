@@ -143,7 +143,7 @@ class ShootingTests(unittest.TestCase):
         target = Target(7, Bounds(700, 220, 720, 260))
         events = self.world.advance_time(0.2, (target,))
         self.assertEqual([(event.projectile_id, event.target_id, event.damage)
-                          for event in events], [(1, 7, 5)])
+                          for event in events], [(1, 7, 4)])
         self.assertEqual((self.world.hp, self.world.mp, self.world.bp), (100, 100, 1))
 
     def test_flying_and_paused_rendering_are_read_only_and_hide_aim_line(self) -> None:

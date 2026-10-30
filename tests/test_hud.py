@@ -29,7 +29,7 @@ from src.statuses import StatusKind
 from src.world import World
 from stage_one_fixtures import perform_action, OPENING_ROWS
 from stage_two_fixtures import STAGE_TWO_CLEAR
-from stage_three_fixtures import METEOR_CLEAR
+from stage_three_fixtures import DEFENDED_CLEAR
 
 
 class HUDTests(unittest.TestCase):
@@ -370,7 +370,7 @@ class HUDTests(unittest.TestCase):
         self.assertEqual(dict(self.world.spells.cooldowns), {})
 
     def test_stage_transition_uses_fresh_resources_effects_and_hud_unlocks(self):
-        for row in OPENING_ROWS + (2, 5): perform_action(self.world, 'shot', row)
+        for row in OPENING_ROWS[:8] + (2, 5): perform_action(self.world, 'shot', row)
         self.assertTrue(self.world.advance_stage()); self.world.transition_to(GameState.PLAYER_AIM)
         labels = self.labels()
         for label in ('Stage 2  Turn 1', 'HP 100/100', 'MP 100/100', 'BP 1/5', 'No spell selected'):
@@ -390,7 +390,7 @@ class HUDCampaignTests(unittest.TestCase):
                 pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=value))
                 for event in pygame.event.get(): game.handle_event(event)
             key(pygame.K_RETURN); key(pygame.K_RETURN)
-            routes = (tuple(('shot', r) for r in OPENING_ROWS + (2, 5)), STAGE_TWO_CLEAR, METEOR_CLEAR)
+            routes = (tuple(('shot', r) for r in OPENING_ROWS + (2, 5)), STAGE_TWO_CLEAR, DEFENDED_CLEAR)
             for stage, route in enumerate(routes, 1):
                 for kind, row in route:
                     while world.player_row != row:
@@ -416,6 +416,6 @@ class HUDCampaignTests(unittest.TestCase):
                     key(pygame.K_RETURN); key(pygame.K_RETURN)
             self.assertIs(world.state, GameState.VICTORY); key(pygame.K_RETURN)
             self.assertIs(world.state, GameState.RESULTS)
-            self.assertEqual((world.stage, world.turn_index, world.hp, world.mp, world.bp), (3, 22, 5, 20, 5))
+            self.assertEqual((world.stage, world.turn_index, world.hp, world.mp, world.bp), (3, 21, 50, 20, 5))
             if reference is None: reference = history
             self.assertEqual(history, reference, schedule)

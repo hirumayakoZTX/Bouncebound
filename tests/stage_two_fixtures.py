@@ -6,12 +6,8 @@ from src.world import STAGE_TWO, World
 from stage_one_fixtures import OPENING_ROWS, perform_action
 
 
-STAGE_TWO_CLEAR = (
-    ('shot', 3), ('shot', 0), ('shot', 0), ('starstorm', 1),
-    ('shot', 0), ('shot', 0), ('shot', 7), ('shot', 0), ('shot', 0),
-    ('shot', 1), ('shot', 0), ('shot', 0), ('shot', 5), ('shot', 0),
-    ('shot', 0), ('shot', 3), ('shot', 0), ('shot', 3),
-)
+STAGE_TWO_CLEAR = tuple(('shot', row) for row in
+                        (3, 3, 2, 2, 4, 3, 1, 1, 5, 5, 3, 3, 3))
 
 
 def definition(*spawns, boss=None, capacity=25):
@@ -41,7 +37,7 @@ def playing(stage=STAGE_TWO):
 
 
 def enter_stage_two(world, *, game=None, schedule=(.25,)):
-    for row in OPENING_ROWS + (2, 5):
+    for row in OPENING_ROWS[:8] + (2, 5):
         perform_action(world, 'shot', row, schedule, game=game)
     assert world.state is GameState.STAGE_CLEAR
     if game is None:

@@ -88,7 +88,7 @@ class OffensiveIntegrationTests(unittest.TestCase):
             self.assertIsNone(result.effects)
             self.assertEqual(vars(world), before)
 
-    def test_spell_cleared_board_still_waits_for_shooting_turns_and_future_waves(self):
+    def test_spell_cleared_board_accelerates_one_wave_after_the_next_resolved_action(self):
         world = self.game.world
         # This is an explicit model call, not a player-facing casting control.
         result = world.execute_offensive_spell('model-fire', 'fire')
@@ -102,13 +102,16 @@ class OffensiveIntegrationTests(unittest.TestCase):
         self.assertFalse(world.resolve_turn())
         self.shoot(3)
         self.assertEqual((world.turn_index, world.bp, world.mp), (2,2,70))
-        self.assertEqual(world.encounter.spawned_waves, {0})
-        self.assertEqual(world.snapshot().enemies, ())
-        self.shoot(3)
-        self.assertEqual(world.turn_index, 3)
         self.assertEqual(world.encounter.spawned_waves, {0,1})
         self.assertEqual([e.enemy_id for e in world.snapshot().enemies], list(range(8,14)))
         self.assertTrue(all(e.turns_alive == 0 for e in world.enemies.values() if e.active))
+        history = tuple(world.encounter.spawn_history)
+        self.shoot(3)
+        self.assertEqual(world.turn_index, 3)
+        self.assertEqual(world.encounter.spawned_waves, {0,1})
+        self.assertEqual(tuple(world.encounter.spawn_history), history)
+        self.assertTrue(world.snapshot().enemies)
+        self.assertTrue(all(e.turns_alive == 1 for e in world.enemies.values() if e.active))
 
     def test_final_model_spell_kill_does_not_activate_stage_or_turn_integration(self):
         config = EncounterDefinition(1, (Wave(1, (Spawn(1, "basic", 6, 3),)),))
@@ -126,7 +129,7 @@ class OffensiveIntegrationTests(unittest.TestCase):
     def test_offensive_history_is_cleared_by_stage_clear_restart(self):
         world = self.game.world
         self.assertTrue(world.execute_offensive_spell('reusable', 'fire').valid)
-        for row in (3,3,2,2,4,4,3):
+        for row in (3,3,2,2,4,3):
             self.shoot(row)
         self.assertIs(world.state, GameState.STAGE_CLEAR)
         self.assertEqual((world.hp, world.mp, world.bp), (100,70,5))

@@ -115,7 +115,7 @@ class StageSchedulerTests(unittest.TestCase):
         self.assertEqual(world.hp, 100)
         self.assertEqual(world.combat.death_events, [])
 
-    def test_future_waves_still_prevent_clear(self):
+    def test_future_wave_accelerates_after_last_enemy_dies_without_premature_clear(self):
         data = stage_data()
         data['waves'].append({'turn': 3, 'spawns': [{'id': 3, 'kind': 'basic', 'col': 0, 'row': 4}]})
         data['completion']['mandatory_enemy_ids'].append(3)
@@ -123,7 +123,9 @@ class StageSchedulerTests(unittest.TestCase):
         clear_stage(world)
         self.assertIs(world.state, GameState.PLAYER_AIM)
         self.assertEqual(world.turn_index, 2)
-        self.assertEqual(world.snapshot().spawned_waves, 1)
+        self.assertEqual(world.snapshot().spawned_waves, 2)
+        self.assertIn(3, world.enemies)
+        self.assertEqual(world.enemies[3].turns_alive, 0)
 
 
 class StageProgressionTests(unittest.TestCase):
@@ -360,7 +362,8 @@ class StageProgressionTests(unittest.TestCase):
     def test_explicit_prototype_fixture_remains_stage_one_only(self):
         world = World(encounter=PROTOTYPE)
         self.assertEqual(set(world.stage_definitions), {1})
-        for row in (3, 3, 2, 2, 4, 4, 3):
+        # Candidate B's stronger Bombs need a longer, valid shooting route.
+        for row in (3,) * 7:
             if world.state is GameState.MENU:
                 world.start_new_run(); world.transition_to(GameState.PLAYER_AIM)
             while world.player_row != row:world.move_player(1 if world.player_row < row else -1)

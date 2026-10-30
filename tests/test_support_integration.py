@@ -78,7 +78,7 @@ class SupportIntegrationTests(unittest.TestCase):
         world = self.game.world
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_UP))
         self.assertEqual(world.player_row,3)  # Bind applies through the next input interval.
-        for row in (3,3,2,2,4,4,3):
+        for row in (3,3,2,2,4,3):
             key = pygame.K_DOWN if row>world.player_row else pygame.K_UP
             for _ in range(abs(row-world.player_row)):
                 self.game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=key))
@@ -90,8 +90,9 @@ class SupportIntegrationTests(unittest.TestCase):
             self.assertTrue(world.resolve_turn())
             self.assertTrue(world.reraise_used)
         self.assertIs(world.state,GameState.STAGE_CLEAR)
-        self.assertEqual((world.turn_index,world.hp,world.mp,world.bp),(7,50,0,5))
-        self.assertEqual(world.statuses.snapshot(),())
+        self.assertEqual((world.turn_index,world.hp,world.mp,world.bp),(6,94,0,5))
+        self.assertEqual({item.kind: item.remaining_turns for item in world.statuses.snapshot()},
+                         {StatusKind.DOOM: 1, StatusKind.RERAISE: None})
         self.assertEqual(len(world.combat.death_events),24)
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_r))
         self.assertIs(world.state,GameState.STAGE_INTRO)

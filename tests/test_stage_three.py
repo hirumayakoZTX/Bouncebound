@@ -26,7 +26,7 @@ from src.world import World,STAGE_ONE,STAGE_TWO,STAGE_THREE
 from stage_one_fixtures import perform_action
 from stage_two_fixtures import perform_aimed_shot
 from stage_three_fixtures import (playing,definition,enter_stage_three,ORDINARY_ROWS,
-                                  METEOR_CLEAR,EXECUTE_CLEAR,DEFENSE_ENDING)
+                                  DEFENDED_CLEAR,EXECUTE_CLEAR)
 
 
 class StageThreeConfigurationTests(unittest.TestCase):
@@ -124,7 +124,7 @@ class StageThreeCampaignTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):pygame.quit()
 
-    def test_full_three_stage_campaign_meteor_victory_results_through_posted_controls(self):
+    def test_full_three_stage_campaign_victory_results_through_posted_controls(self):
         game=Game();game.running=True
         for _ in range(2):pygame.event.post(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_RETURN))
         for event in pygame.event.get():game.handle_event(event)
@@ -132,29 +132,31 @@ class StageThreeCampaignTests(unittest.TestCase):
         w=game.world;self.assertEqual((w.stage,w.hp,w.mp,w.bp,w.turn_index),(3,100,100,1,1))
         self.assertTrue(w.select_spell('meteor'));before=deepcopy(vars(w))
         self.assertFalse(w.advance_stage());self.assertEqual(vars(w),before)
-        for k,row in METEOR_CLEAR[:-1]:perform_action(w,k,row,game=game)
-        self.assertEqual((w.hp,w.mp,w.enemies[500].hp,w.enemies[500].odin_phase),(5,100,5,2))
-        for key in (pygame.K_3,pygame.K_SPACE,pygame.K_SPACE):
-            pygame.event.post(pygame.event.Event(pygame.KEYDOWN,key=key))
+        for k,row in DEFENDED_CLEAR[:-1]:perform_action(w,k,row,game=game)
+        self.assertEqual((w.hp,w.mp,w.enemies[500].hp,w.enemies[500].odin_phase),(50,20,30,0))
+        target=(96,96+48*3)
+        pygame.event.post(pygame.event.Event(pygame.MOUSEMOTION,pos=target))
+        pygame.event.post(pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=target))
         for event in pygame.event.get():game.handle_event(event)
-        self.assertIs(w.state,GameState.SPELL_ANIMATION)
-        self.assertEqual((w.mp,w.enemies[500].hp),(20,0));self.assertFalse(w._pending_action.completed)
-        self.assertFalse(w.resolve_turn());self.assertEqual(w.last_resolved_turn,21)
+        self.assertIs(w.state,GameState.SHOT_ANIMATION)
+        self.assertEqual((w.mp,w.enemies[500].hp),(20,30));self.assertFalse(w._pending_action.completed)
+        self.assertFalse(w.resolve_turn());self.assertEqual(w.last_resolved_turn,20)
         w.pause();frozen=deepcopy(vars(w))
         for _ in range(4):w.advance_time(100);self.assertFalse(w.resolve_turn())
         self.assertEqual(vars(w),frozen);w.resume()
-        while w.state is GameState.SPELL_ANIMATION:w.advance_time(.05)
+        while w.state is GameState.SHOT_ANIMATION:w.advance_time(.05)
+        self.assertEqual(w.enemies[500].hp,0)
         self.assertIs(w.state,GameState.TURN_RESOLVE);self.assertTrue(w.resolve_turn())
         self.assertIs(w.state,GameState.VICTORY)
-        self.assertEqual((w.stage,w.turn_index,w.hp,w.mp,w.bp),(3,22,5,20,5))
+        self.assertEqual((w.stage,w.turn_index,w.hp,w.mp,w.bp),(3,21,50,20,5))
         self.assertEqual(len(w.combat.death_events),40)
-        self.assertEqual(w.enemies[500].turns_alive,2) # No final EXECUTE.
+        self.assertEqual(w.enemies[500].turns_alive,3) # No extra action after the authorized final shot.
         before=deepcopy(vars(w));self.assertFalse(w.resolve_turn())
         game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_RETURN,repeat=True))
         self.assertEqual(vars(w),before)
         game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_RETURN))
         self.assertIs(w.state,GameState.RESULTS)
-        self.assertEqual((w.hp,w.mp,w.bp,w.stage,w.turn_index),(5,20,5,3,22))
+        self.assertEqual((w.hp,w.mp,w.bp,w.stage,w.turn_index),(50,20,5,3,21))
         game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_r))
         self.assertEqual((w.stage,w.state,w.hp,w.mp,w.bp),(1,GameState.STAGE_INTRO,100,100,1))
         self.assertEqual(w.encounter.definition,STAGE_ONE)
@@ -165,29 +167,29 @@ class StageThreeCampaignTests(unittest.TestCase):
         w=playing()
         for k,row in EXECUTE_CLEAR:perform_action(w,k,row)
         self.assertIs(w.state,GameState.VICTORY)
-        self.assertEqual((w.turn_index,w.hp,w.mp,w.bp),(24,10,10,5))
+        self.assertEqual((w.turn_index,w.hp,w.mp,w.bp),(21,50,20,5))
         self.assertEqual(sum(e.kind is StatusEventKind.RERAISE_ACTIVATED for e in w.status_events),1)
         self.assertEqual(sum(e.kind is StatusEventKind.WARD_BLOCKED for e in w.status_events),1)
         forced=[e for e in w.status_events if e.kind is StatusEventKind.FORCED_KNOCKOUT]
-        self.assertEqual([(e.turn,e.source_id)for e in forced],[(22,'odin_execute')])
+        self.assertEqual([(e.turn,e.source_id)for e in forced],[(20,'odin_execute')])
 
-    def test_shooting_only_stage_three_clear_retains_original_spell_values(self):
+    def test_defended_stage_three_clear_retains_original_spell_values(self):
         w=playing()
-        for row in ORDINARY_ROWS+(4,3,3):perform_action(w,'shot',row)
+        for k,row in DEFENDED_CLEAR:perform_action(w,k,row)
         self.assertIs(w.state,GameState.VICTORY)
-        self.assertEqual((w.hp,w.mp,w.bp,w.turn_index),(5,100,5,22))
-        self.assertEqual(w.spells.cooldowns,{})
+        self.assertEqual((w.hp,w.mp,w.bp,w.turn_index),(50,20,5,21))
+        self.assertEqual({spell.value for spell in w.spells.cooldowns}, {'ward','reraise'})
 
-    def test_final_meteor_clear_precedes_due_poison_doom_hazards_and_odin(self):
+    def test_final_shot_clear_precedes_due_poison_doom_hazards_and_odin(self):
         w=playing()
-        for k,row in METEOR_CLEAR[:-1]:perform_action(w,k,row)
+        for k,row in DEFENDED_CLEAR[:-1]:perform_action(w,k,row)
         w.apply_status(StatusKind.POISON,1);w.apply_status(StatusKind.DOOM,1);w.place_poison_tile(3)
         for e in w.statuses.snapshot():w.statuses.put(replace(e,applied_turn=w.turn_index-1))
         tile=w.hazards.snapshot()[0];w.hazards.put(replace(tile,applied_turn=w.turn_index-1))
-        before=w.snapshot();perform_action(w,'meteor',3)
+        before=w.snapshot();perform_action(w,'shot',3)
         self.assertIs(w.state,GameState.VICTORY);self.assertEqual(w.hp,before.hp)
         self.assertEqual(w.status_events,before.status_events);self.assertEqual(w.hazards.snapshot(),before.hazards)
-        self.assertEqual(w.enemies[500].odin_phase,2)
+        self.assertEqual(w.enemies[500].odin_phase,0)
 
     def test_meteor_cost_cooldown_global_targeting_and_duplicate_main_action_guards(self):
         w=playing(definition((1,'tonberry',7,3),(2,'diremite',0,7),(3,'gorgon',0,6)))
@@ -213,24 +215,24 @@ class StageThreeCampaignTests(unittest.TestCase):
         self.assertTrue(any(e.kind is StatusEventKind.DOOM_ADVANCED for e in w.status_events))
         self.assertTrue(w.restart());self.assertEqual(w.stage,1)
 
-    def test_stage_three_defense_failure_keeps_hp_and_never_spawns_odin(self):
-        w=playing()
-        for row in ORDINARY_ROWS[:-1]:perform_action(w,'shot',row)
-        for kind,row,target in DEFENSE_ENDING:
-            if kind=='shot':perform_aimed_shot(w,row,target)
-            else:perform_action(w,kind,row)
+    def test_stage_three_fixture_defense_failure_keeps_hp_and_never_spawns_odin(self):
+        w=playing(definition((445,'basic',13,3)))
+        perform_action(w,'shot',0)
         self.assertIs(w.game_over_reason,GameOverReason.DEFENSE_FAILED)
-        self.assertEqual((w.hp,w.mp,w.bp,w.turn_index),(95,0,5,28))
-        self.assertTrue(w.enemies[445].escaped);self.assertEqual(w.enemies[445].hp,15)
-        self.assertEqual(len(w.combat.death_events),38)
+        self.assertEqual((w.hp,w.mp,w.bp,w.turn_index),(95,100,1,1))
+        self.assertTrue(w.enemies[445].escaped);self.assertEqual(w.enemies[445].hp,5)
+        self.assertEqual(len(w.combat.death_events),0)
         self.assertFalse(w.encounter.boss_wave_spawned);self.assertNotIn(500,w.enemies)
         self.assertTrue(w.restart());self.assertEqual(w.stage,1)
 
     def test_canonical_doom_knockout_is_reachable_without_fixture_status_or_hp_edits(self):
-        w=playing()
-        for row in (0,0,3,0,0,0):perform_action(w,'shot',row)
+        w=playing(definition((401,'gorgon',0,3),(402,'tonberry',0,7)))
+        perform_action(w,'shot',0);perform_action(w,'shot',0)
+        self.assertEqual(w.statuses.get(StatusKind.DOOM).remaining_turns,5)
+        perform_action(w,'fire',3)
+        for _ in range(3):perform_action(w,'shot',0)
         self.assertEqual(w.statuses.get(StatusKind.DOOM).remaining_turns,1)
-        self.assertEqual(w.hp,85)
+        self.assertEqual(w.hp,100)
         perform_action(w,'shot',0)
         self.assertIs(w.game_over_reason,GameOverReason.HP_DEPLETED)
         self.assertEqual((w.hp,w.turn_index),(0,7))
@@ -238,11 +240,16 @@ class StageThreeCampaignTests(unittest.TestCase):
                             for e in w.status_events))
 
     def test_canonical_doom_reraise_uses_actual_enemy_effects_and_one_cast_allowance(self):
-        w=playing()
-        for row in (0,0,3,0,0,0):perform_action(w,'shot',row)
+        w=playing(definition((401,'gorgon',0,3),(402,'tonberry',0,7)))
+        perform_action(w,'shot',0);perform_action(w,'shot',0)
+        perform_action(w,'fire',3)
         perform_action(w,'reraise',0)
-        self.assertEqual((w.hp,w.mp,w.turn_index),(50,50,8))
+        self.assertEqual((w.hp,w.mp,w.turn_index),(100,20,5))
         self.assertIs(w.state,GameState.PLAYER_AIM)
+        self.assertIsNotNone(w.statuses.get(StatusKind.DOOM))
+        self.assertIsNotNone(w.statuses.get(StatusKind.RERAISE));self.assertTrue(w.reraise_used)
+        for _ in range(3):perform_action(w,'shot',0)
+        self.assertEqual((w.hp,w.mp,w.turn_index),(50,20,8))
         self.assertIsNone(w.statuses.get(StatusKind.DOOM))
         self.assertIsNone(w.statuses.get(StatusKind.RERAISE));self.assertTrue(w.reraise_used)
         perform_action(w,'shot',0)
@@ -293,12 +300,14 @@ class StageThreeCampaignTests(unittest.TestCase):
         before=deepcopy(vars(w));self.assertFalse(w.resolve_turn());self.assertEqual(vars(w),before)
 
     def test_all_terminal_outcomes_and_execute_survival_are_frame_schedule_invariant(self):
-        for mode in ('meteor','execute','HP','defense'):
+        for mode in ('clear','execute','HP','defense'):
             reference=None
             for schedule in ((1/30,),(1/60,),(1/144,),(.004,.041,.009,.024,.005,.017)):
-                w=playing();history=[]
-                if mode in ('meteor','execute'):
-                    for k,row in METEOR_CLEAR if mode=='meteor' else EXECUTE_CLEAR:
+                w=(playing(definition((445,'basic',13,3)))
+                   if mode=='defense' else playing())
+                history=[]
+                if mode in ('clear','execute'):
+                    for k,row in DEFENDED_CLEAR if mode=='clear' else EXECUTE_CLEAR:
                         perform_action(w,k,row,schedule)
                         history.append((w.snapshot(),tuple(w.combat.death_events),
                                         tuple(w.encounter.spawn_history),
@@ -306,11 +315,8 @@ class StageThreeCampaignTests(unittest.TestCase):
                 elif mode=='HP':
                     for _ in range(12):perform_action(w,'shot',0,schedule)
                 else:
-                    for row in ORDINARY_ROWS[:-1]:perform_action(w,'shot',row,schedule)
-                    for kind,row,target in DEFENSE_ENDING:
-                        if kind=='shot':perform_aimed_shot(w,row,target,schedule)
-                        else:perform_action(w,kind,row,schedule)
-                        history.append((w.snapshot(),tuple(w.combat.death_events)))
+                    perform_action(w,'shot',0,schedule)
+                    history.append((w.snapshot(),tuple(w.combat.death_events)))
                 outcome=(w.snapshot(),tuple(w.combat.death_events),tuple(w.encounter.spawn_history),history)
                 if reference is None:reference=outcome
                 self.assertEqual(outcome,reference,(mode,schedule))
@@ -343,7 +349,7 @@ class StageThreeCampaignTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             try:
                 os.chdir(directory);w=playing()
-                for k,row in METEOR_CLEAR:perform_action(w,k,row)
+                for k,row in DEFENDED_CLEAR:perform_action(w,k,row)
                 w.transition_to(GameState.RESULTS)
                 self.assertEqual(list(Path(directory).iterdir()),[])
             finally:os.chdir(previous)

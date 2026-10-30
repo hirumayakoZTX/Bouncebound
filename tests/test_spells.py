@@ -137,7 +137,7 @@ class SpellValidationTests(unittest.TestCase):
         result = self.world.validate_spell('fire')
         self.assertEqual(result.cast.targets.enemy_ids, (3,))
         self.assertIs(result.cast.targets.kind, TargetKind.NEAREST_IN_ROW)
-        self.assertEqual(self.world.enemies[3].hp, 5)
+        self.assertEqual(self.world.enemies[3].hp, 10)
 
     def test_fire_with_no_enemy_in_current_row_is_invalid(self) -> None:
         self.world.move_player(-1)
@@ -164,7 +164,7 @@ class SpellValidationTests(unittest.TestCase):
                 self.assertEqual(self.world.validate_spell(spell_id).cast.targets.enemy_ids, (9,))
         self.assertEqual(dead.hp, 0)
         self.assertTrue(escaped.escaped)
-        self.assertEqual(escaped.hp, 5)
+        self.assertEqual(escaped.hp, 10)
 
     def test_starstorm_uses_clamped_circle_and_sorted_enemy_centers(self) -> None:
         for enemy in (Enemy(7, EnemyType.BASIC, 8, 3),

@@ -7,13 +7,11 @@ from stage_one_fixtures import perform_action
 from stage_two_fixtures import enter_stage_two, STAGE_TWO_CLEAR
 
 
-ORDINARY_ROWS = (3,4,3, 2,3,2, 4,5,4, 1,2,1, 5,6,5, 2,3,2, 3)
-METEOR_CLEAR = tuple(('shot',row) for row in ORDINARY_ROWS) + (
-    ('shot',4),('shot',3),('meteor',3),
+ORDINARY_ROWS = (3,3,3,2,2,3,4,4,5,1,1,5,5,2,2,3,3,3)
+DEFENDED_CLEAR = tuple(('shot',row) for row in ORDINARY_ROWS) + (
+    ('ward',3),('reraise',3),('shot',3),
 )
-EXECUTE_CLEAR = tuple(('shot',row) for row in ORDINARY_ROWS) + (
-    ('ward',3),('reraise',3),('cure',3),('shot',3),('shot',3),
-)
+EXECUTE_CLEAR = DEFENDED_CLEAR
 
 
 def definition(*spawns, boss=None, capacity=25):
@@ -54,10 +52,3 @@ def enter_stage_three(world, *, game=None, schedule=(.25,)):
         for _ in range(2):pygame.event.post(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_RETURN))
         for event in pygame.event.get():game.handle_event(event)
     assert world.stage==3 and world.turn_index==1
-
-
-DEFENSE_ENDING = (
-    ('shot',0,(740,456)),('shot',0,(768,456)),
-    ('esuna',0,None),('levitation',0,None),('ward',0,None),('cure',0,None),('esuna',0,None),
-    ('shot',1,(740,96)),('shot',1,(480,72)),('shot',0,(96,360)),
-)

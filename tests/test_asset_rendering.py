@@ -21,7 +21,7 @@ from src.statuses import StatusKind
 from src.world import World
 from stage_one_fixtures import OPENING_ROWS
 from stage_two_fixtures import STAGE_TWO_CLEAR
-from stage_three_fixtures import METEOR_CLEAR
+from stage_three_fixtures import DEFENDED_CLEAR
 
 
 class AssetRenderingTests(unittest.TestCase):
@@ -133,7 +133,7 @@ class AssetRenderingTests(unittest.TestCase):
         with patch.object(renderer.hud, '_text', wraps=renderer.hud._text) as hud_text:
             renderer.draw(self.screen,w.snapshot())
         labels.extend(call.args[1] for call in hud_text.call_args_list)
-        self.assertIn('S5',labels);self.assertIn('B5',labels)
+        self.assertIn('S5',labels);self.assertIn('B10',labels)
         self.assertIn('Cure requires missing HP',labels)
         self.assertTrue(any('HP 100/100' in text for text in labels))
         self.assertIn('[4] Pom Cure',labels);self.assertIn('MP 10',labels)
@@ -192,15 +192,18 @@ class AssetRenderingTests(unittest.TestCase):
                 elif phase is GameState.PLAYER_AIM:
                     ident=stage,turn
                     if ident in state['issued']:return
-                    if stage==1:kind,row='shot',(OPENING_ROWS+(2,5))[turn-1]
-                    else:kind,row=(STAGE_TWO_CLEAR if stage==2 else METEOR_CLEAR)[turn-1]
+                    if stage==1:kind,row='shot',(OPENING_ROWS[:8]+(2,5))[turn-1]
+                    else:kind,row=(STAGE_TWO_CLEAR if stage==2 else DEFENDED_CLEAR)[turn-1]
                     if snapshot.player_row!=row:
                         key(pygame.K_DOWN if snapshot.player_row<row else pygame.K_UP);return
                     if kind=='shot':
                         target=(96,96+48*row)
                         pygame.event.post(pygame.event.Event(pygame.MOUSEMOTION,pos=target))
                         pygame.event.post(pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=target))
-                    else:key(pygame.K_2 if kind=='starstorm' else pygame.K_3);key(pygame.K_SPACE)
+                    else:
+                        spell_key={'starstorm':pygame.K_2,'meteor':pygame.K_3,
+                                   'ward':pygame.K_7,'reraise':pygame.K_8}[kind]
+                        key(spell_key);key(pygame.K_SPACE)
                     state['issued'].add(ident)
                 elif phase in(GameState.SHOT_ANIMATION,GameState.SPELL_ANIMATION):
                     if phase not in state['paused']:
@@ -213,7 +216,7 @@ class AssetRenderingTests(unittest.TestCase):
                 elif phase is GameState.STAGE_CLEAR:key(pygame.K_RETURN)
                 elif phase is GameState.VICTORY:key(pygame.K_RETURN)
                 elif phase is GameState.RESULTS:
-                    self.assertEqual((stage,turn,snapshot.hp,snapshot.mp,snapshot.bp),(3,22,5,20,5))
+                    self.assertEqual((stage,turn,snapshot.hp,snapshot.mp,snapshot.bp),(3,21,50,20,5))
                     outcomes.append(snapshot);state['results']=True;key(pygame.K_r)
             class Clock:
                 def tick(self,fps):
