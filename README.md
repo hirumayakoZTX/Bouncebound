@@ -137,16 +137,24 @@ rows. Each wave includes one blue crystal:
 | 9 | 7 | 5 |
 
 There are 28 ordinary enemies and five crystals. The first wave appears when
-entering the battlefield. Later entries spawn after the enemy phase and turn
-increment. Occupied cells and the 25-active-enemy capacity defer individual
-entries safely; crystals do not count toward capacity. A partially deferred wave
-is not counted as complete, and retries never overwrite actors or duplicate IDs.
+entering the battlefield. If enemies remain alive, later waves keep their
+configured schedule and spawn after the enemy phase and turn increment. If a
+completed player action leaves no living enemies, the next unspawned ordinary
+wave accelerates at that same safe boundary, so no extra empty-board shot is
+needed. At most one future wave is accelerated at a boundary; this does not add
+a turn or an enemy phase. Occupied cells and the 25-active-enemy capacity defer
+individual entries safely; crystals do not count toward capacity. A partially
+deferred wave is not counted as complete, and retries never overwrite actors or
+duplicate IDs.
 
 After every orb or spell animation and combat effect finishes, surviving enemies
 take one phase, then the turn increases once and aiming resumes. Movement,
 aiming, selection, and invalid shots or casts never trigger an enemy phase.
-Empty turns still need a valid shot or spell. An empty ordinary battlefield does
-not clear the stage while future entries or the boss group remain pending.
+Wave acceleration happens only after that full resolution, and does not clear
+active hazards or skip statuses. If enemies survive, the configured wave schedule
+continues unchanged. Boss eligibility and Stage Clear/Victory conditions are
+unchanged: required ordinary waves and enemies must be resolved before the boss
+group, and the boss must still be defeated. No scoring changes are included.
 
 Ultros (purple, **U**) and Typhon (gold, **T**) each have **15 HP**. They appear
 together at column 7, rows 2 and 5, after every scripted entry has spawned and all
@@ -509,29 +517,30 @@ Test W/S, arrow keys, mouse aiming, and Escape pause/resume. Full-HP Cure must b
 rejected without MP or turn loss. Keys 3, 5, and 6 must show "Spell locked".
 
 A reproducible **shooting-only clear** from a fresh run uses horizontal leftward
-shots from these rows on Turns 1 through 11 (rows are numbered 0–7):
+shots from these rows (rows are numbered 0–7):
 
-**3, 3, 2, 2, 4, 4, 1, 1, 5, 2, 5**
+**3, 3, 2, 2, 4, 4, 1, 1, 2, 5**
 
 Aim at the arena's left edge on the player's row and left-click each turn. The
-first nine volleys clear the ordinary waves and earn BP 5. On Turn 10, Ultros and
-Typhon should both appear with 15 HP. The row-2 volley defeats Ultros; Typhon
-attacks once. The row-5 volley defeats Typhon and reaches Stage Clear on Turn 11
-at **HP 95, MP 100, BP 5**. Final enemy attacks must not occur after the clear.
+first eight volleys clear the ordinary waves and earn BP 5. Ultros and Typhon
+appear at the next aiming phase with 15 HP each. The row-2 volley defeats
+Ultros; Typhon attacks once. The row-5 volley defeats Typhon and reaches Stage
+Clear on Turn 10 at **HP 95, MP 100, BP 5**. Final enemy attacks must not occur
+after the clear.
 Press R and Enter to verify fresh canonical waves, resources, and no old bosses.
 
-For a **spell-and-shot clear**, use the same first nine shots, then:
+For a **spell-and-shot clear**, use the same first eight shots, then:
 
-1. Turn 10: move to row 2, press **1**, then **Space** for Fire. Ultros dies;
+1. Turn 9: move to row 2, press **1**, then **Space** for Fire. Ultros dies;
    Typhon attacks, leaving HP 95 and MP 70. Pause/resume the spell animation.
-2. Turn 11: move to row 5, press **2**, then **Space** for Starstorm. Typhon falls
+2. Turn 10: move to row 5, press **2**, then **Space** for Starstorm. Typhon falls
    to 5 HP, then attacks, leaving HP 90 and MP 30.
-3. Turn 12: shoot horizontally from row 5. The orb hit finishes Typhon and clears
+3. Turn 11: shoot horizontally from row 5. The orb hit finishes Typhon and clears
    Stage 1 at **HP 90, MP 30, BP 5**. Pause/resume during the volley as another check.
 
 Additional clicks or Space presses during either animation must not add actions.
-Fire's next ready turn after its Turn-10 cast is Turn 14; cooldowns do not tick
-while paused. On Turn 12, before the final volley, selecting Reraise with only 30 MP must show
+Fire's next ready turn after its Turn-9 cast is Turn 13; cooldowns do not tick
+while paused. On Turn 11, before the final volley, selecting Reraise with only 30 MP must show
 "Not enough MP" and leave shooting available. Cure heals missing HP, Ward blocks one damage event,
 and Reraise provides one revival per encounter; each valid cast consumes one main
 action. To repeat with full MP, finish the encounter and press R at its terminal
@@ -555,56 +564,41 @@ For a reproducible Stage 2 clear, use the following actions. All shots aim at
 **(96, 96 + 48 × row)**, horizontally leftward. Move before each action; wait
 for aiming to resume before the next one.
 
-| Turn(s) | Action | Player row |
-|---|---|---:|
-| 1 | Shoot | 3 |
-| 2–3 | Shoot each turn | 0 |
-| 4 | Select 2, Space: Starstorm | 1 |
-| 5–6 | Shoot each turn | 0 |
-| 7 | Shoot | 7 |
-| 8–9 | Shoot each turn | 0 |
-| 10 | Shoot | 1 |
-| 11–12 | Shoot each turn | 0 |
-| 13 | Shoot | 5 |
-| 14–15 | Shoot each turn | 0 |
-| 16 | Shoot | 3 |
-| 17 | Shoot | 0 |
-| 18 | Shoot Chichu | 3 |
+| Turn | Action | Player row |
+|---:|---|---:|
+| 1–10 | Shoot each turn | 3, 2, 2, 4, 3, 1, 5, 3, 3, 3 |
 
-Chichu arrives on Turn 18 with 30 HP. The last volley clears Stage 2 at
-**HP 95, MP 60, BP 5**. Enter opens Stage 3 Intro; Enter again starts it.
+The cleared waves accelerate when no living enemies remain, while surviving
+enemies keep the configured schedule. Chichu appears after the ordinary waves
+are cleared; the last volley clears Stage 2 on Turn 10 at **HP 95, MP 100, BP 5**.
+Enter opens Stage 3 Intro; Enter again starts it.
 R instead returns to a fresh Stage 1 Intro. The fast clear deliberately uses Bomb clusters to prevent
 most abilities; the following separate check lets the new effects operate.
 
-For real status and floor feedback, enter Stage 2 fresh, shoot from rows
-**3, 0, 0** on Turns 1–3, then use these precise mouse targets:
-
-- Turn 4: row 0, click **(480, 456)**.
-- Turn 5: row 2, click **(480, 72)**.
-- Turn 6: row 6, click **(96, 384)**.
-- Turn 7: movement is bound; select **5**, Space for Esuna from row 6. Poison
-  and Bind disappear; the tile still causes 5 damage (HP 95, MP 80).
-- Turn 8: select **6**, Space for Levitation from row 6. The tile is blocked;
-  Cactuar needles still cause 5 damage (HP 90, MP 60).
+To see the Stage 2 status abilities, let a Morbol and Bulb survive for three
+enemy phases: Morbol applies Bind and Poison, and Bulb places a PoisonTile on
+the player's row. Esuna removes Poison and Bind; Levitation blocks floor damage
+while the tile remains active. A tile still loses duration during each eligible
+phase, even when the player is elsewhere or Levitation blocks its damage.
 
 Pause/resume either spell animation and confirm no duplicate payment, damage,
 status tick, or enemy phase. Continue playing or finish the run before restarting.
 
 For Stage 2 HP defeat, shoot horizontally from row 0 each turn in a fresh Stage 2;
 Game Over occurs on Turn 12 with HP 0. For defense failure with HP remaining,
-follow the Stage 2 clear recipe through Turn 17, then deliberately miss Chichu:
+follow the first nine actions of the Stage 2 clear recipe, then deliberately miss Chichu:
 
 | Turn | Player row | Click target |
 |---:|---:|---|
-| 18 | 0 | (240, 72) |
-| 19–20 | 5 | (650, 360) each turn |
-| 21 | 0 | (740, 72) |
-| 22 | 1 | (740, 96) |
-| 23 | 1 | (480, 72) |
-| 24 | 0 | (96, 360) |
+| 10 | 0 | (240, 72) |
+| 11–12 | 5 | (650, 360) each turn |
+| 13 | 0 | (740, 72) |
+| 14 | 1 | (740, 96) |
+| 15 | 1 | (480, 72) |
+| 16 | 0 | (96, 360) |
 
-Chichu escapes on Turn 24 and the run ends with **Defense failed, HP 27**,
-MP 60, BP 5. These paths use ordinary movement, aiming, shots, and spell controls;
+Chichu escapes on Turn 16 and the run ends with **Defense failed, HP 27**,
+MP 100, BP 5. These paths use ordinary movement, aiming, shots, and spell controls;
 no resource or enemy-HP edits are required. Restart after success and both defeats,
 check the Stage 1 first wave, and verify clean window exit.
 
@@ -652,37 +646,34 @@ and turn remain visible through Victory and Results. No score is calculated.
 ### Full-game victory smoke test
 
 1. Start from the menu with Enter twice. Clear Stage 1 with horizontal shots from
-   rows **3,3,2,2,4,4,1,1,5,2,5**. Enter twice advances to Stage 2.
-2. Follow the Stage 2 clear table above. It ends on Turn 18 with HP 95, MP 60,
+   rows **3,3,2,2,4,4,1,1,2,5**. Stage Clear appears on Turn 10. Enter twice
+   advances to Stage 2.
+2. Follow the Stage 2 clear table above. It ends on Turn 10 with HP 95, MP 100,
    BP 5. Enter twice advances to Stage 3 with **HP/MP/BP 100/100/1**, Turn 1.
-3. On Stage 3 Turns 1–19, shoot horizontally from these rows:
+3. On Stage 3, shoot horizontally from rows
+   **3,4,3, 2,3,2, 4,5,4, 1,2,1, 5,6,5, 2** for the first 16 turns. Accelerated
+   waves appear only after the preceding enemy field is cleared; ordinary
+   survivors retain their configured turn schedule. Odin appears after the
+   scripted enemies are defeated, with 50 HP.
+4. Turn 17: shoot horizontally from row **3**. Odin takes 25 damage, then
+   SLASH leaves the player at 39 HP.
+5. Turn 18: shoot horizontally from row **3** again. The volley defeats Odin
+   before another enemy phase. **Victory → Results** shows Stage 3, Turn 18,
+   HP 39, MP 100, BP 5. R restarts at Stage 1 Intro with encounter state reset.
 
-   **3,4,3, 2,3,2, 4,5,4, 1,2,1, 5,6,5, 2,3,2, 3**
-
-   Aim each shot at **(96, 96 + 48 × row)**. Move before shooting and wait for the
-   next aiming phase. Tonberry retaliation and Poison leave **85 HP, MP 100,
-   BP 5** when Odin arrives on Turn 20 with 50 HP.
-4. Turn 20: shoot horizontally from row **4**. Odin falls to 35 HP, then SLASH
-   leaves the player at 45 HP.
-5. Turn 21: shoot horizontally from row **3**. Odin falls to 5 HP; the second
-   SLASH leaves the player at 5 HP.
-6. Turn 22: select **3**, press Space for Meteor. Confirm MP 20 and Odin's death.
-   The animation must finish before **Victory**; EXECUTE must not occur. Enter
-   opens Results showing **Stage 3, Turn 22, HP 5, MP 20, BP 5**. R restarts at
-   Stage 1 Intro with all encounter state reset.
-
-The same route works by shooting from row 3 instead of the final Meteor; MP
-then remains 100. To demonstrate Odin's defenses, follow Turns 1–19 above, then:
+To demonstrate Meteor, select **3** and cast during Stage 3; it costs 80 MP,
+deals 15 damage to each active enemy, and consumes one turn. The campaign clear
+route uses projectiles against Odin. To demonstrate Odin's defenses, follow the
+first 16 Stage 3 shots above, then:
 
 | Turn | Action from row 3 | Expected outcome |
 |---:|---|---|
-| 20 | Ward (7, Space) | First SLASH blocked; HP 85, MP 70 |
-| 21 | Reraise (8, Space) | Second SLASH; HP 45, MP 20 |
-| 22 | Cure (4, Space) | Heal to 95, EXECUTE, revive to 50; MP 10 |
-| 23 | Shoot | Odin 5 HP; next SLASH leaves HP 10 |
-| 24 | Shoot | Victory at HP 10, MP 10, BP 5 |
+| 17 | Ward (7, Space) | First SLASH blocked |
+| 18 | Reraise (8, Space) | Second SLASH; Reraise remains pending |
+| 19 | Shoot from row 3 | Odin takes 25; EXECUTE triggers the one-use revival to 50 HP |
+| 20 | Shoot from row 3 | Victory at HP 50, MP 20, BP 5 |
 
-Pause/resume a shot and Meteor animation. Extra clicks/Space must not create
+Pause/resume a shot or spell animation. Extra clicks/Space must not create
 another action; paused time must not advance abilities, cooldowns, or statuses.
 Restart from both Victory and Results, and verify clean window exit.
 

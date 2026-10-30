@@ -354,6 +354,18 @@ class World:
             return ()
         return self.encounter.spawn_due(self.turn_index, self.combat)
 
+    def _spawn_after_resolved_turn(self) -> tuple[int, ...]:
+        """Schedule due waves and accelerate at most one after a complete turn."""
+        if (self.encounter is None or self.state is not GameState.TURN_RESOLVE
+                or self._pending_action is not None
+                or self.last_resolved_turn != self.turn_index - 1
+                or any(orb.active for orb in self.projectiles)
+                or self.combat.pending_deaths or self.combat.pending_bp):
+            return ()
+        return self.encounter.spawn_due(
+            self.turn_index, self.combat, accelerate_if_empty=True
+        )
+
     def pause(self) -> bool:
         return self.transition_to(GameState.PAUSED)
 
@@ -608,7 +620,7 @@ class World:
             self.turn_index += 1
             self.spell_feedback = ""
             self.last_spell_result = None
-            self.spawn_waves()
+            self._spawn_after_resolved_turn()
             self.transition_to(GameState.PLAYER_AIM)
         return True
 
