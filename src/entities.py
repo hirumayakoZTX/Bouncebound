@@ -70,7 +70,7 @@ STAGE_THREE_ENEMIES = frozenset({EnemyType.MANDRAGORA, EnemyType.DIREMITE,
                                 EnemyType.TONBERRY, EnemyType.GORGON, EnemyType.ODIN})
 # HP and active-attack damage. All types retain five-HP defense-line contact.
 ENEMY_STATS = MappingProxyType({
-    EnemyType.BASIC: (5, 0), EnemyType.BOMB: (5, 0),
+    EnemyType.BASIC: (5, 0), EnemyType.BOMB: (10, 0),
     EnemyType.ULTROS: (15, 5), EnemyType.TYPHON: (15, 5),
     EnemyType.CACTUAR: (10, 5), EnemyType.ALLIGATOR: (12, 4),
     EnemyType.BULB: (8, 0), EnemyType.MORBOL: (18, 0),

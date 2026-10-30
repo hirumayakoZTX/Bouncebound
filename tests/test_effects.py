@@ -26,7 +26,7 @@ from src.statuses import StatusKind, StatusEventKind
 from src.world import World
 from stage_one_fixtures import OPENING_ROWS, perform_action
 from stage_two_fixtures import STAGE_TWO_CLEAR
-from stage_three_fixtures import METEOR_CLEAR, playing, definition
+from stage_three_fixtures import DEFENDED_CLEAR, playing, definition
 
 
 class EffectsTests(unittest.TestCase):
@@ -65,12 +65,12 @@ class EffectsTests(unittest.TestCase):
         self.assertEqual(orb.velocity,(520,520))
 
     def test_enemy_reflection_is_not_misreported_as_a_wall_bounce(self):
-        self.enemy();self.fire();self.world.projectiles=[Projectile(1,(343,240),(-520,0))]
+        enemy=self.enemy();enemy.hp=4;self.fire();self.world.projectiles=[Projectile(1,(343,240),(-520,0))]
         self.world.advance_time(PHYSICS_STEP)
         self.assertEqual([e.kind for e in self.world.combat.observations],['hit','death'])
 
     def test_substep_hit_and_death_are_captured_even_when_enemy_disappears(self):
-        self.enemy();self.fire();self.update();self.world.projectiles=[Projectile(1,(343,240),(-520,0))]
+        enemy=self.enemy();enemy.hp=4;self.fire();self.update();self.world.projectiles=[Projectile(1,(343,240),(-520,0))]
         self.world.advance_time(PHYSICS_STEP);self.assertFalse(self.world.snapshot().enemies)
         self.update();self.assertEqual(self.kinds(),['hit','death'])
         self.assertEqual([e.position for e in self.layer.last_events],[(312,240),(312,240)])
@@ -81,7 +81,7 @@ class EffectsTests(unittest.TestCase):
         hits=self.world.advance_time(PHYSICS_STEP);self.update()
         self.assertEqual([e.projectile_id for e in hits],[1,2,3])
         self.assertEqual(self.kinds(),['hit']*3)
-        self.assertEqual([e.label for e in self.layer.last_events],['-5']*3)
+        self.assertEqual([e.label for e in self.layer.last_events],['-4']*3)
 
     def test_hit_and_death_do_not_replay_on_repeated_updates_or_draws(self):
         self.enemy();self.world.combat.apply_damage(1,5);self.update()
@@ -107,7 +107,7 @@ class EffectsTests(unittest.TestCase):
     def test_bomb_chain_observations_follow_actual_fifo_death_order(self):
         for identifier,col,kind in ((1,1,EnemyType.BOMB),(2,2,EnemyType.BOMB),(3,3,EnemyType.BASIC)):
             self.enemy(kind,identifier,col)
-        self.world.combat.apply_damage(1,5);self.update()
+        self.world.combat.apply_damage(1,10);self.update()
         self.assertEqual(self.kinds(),['hit','explosion','hit','explosion','hit','death'])
         self.assertEqual([e.entity_id for e in self.layer.last_events if e.kind in ('explosion','death')],[1,2,3])
         self.assertEqual(len(self.world.combat.death_events),3)
@@ -465,7 +465,7 @@ class EffectsCampaignTests(unittest.TestCase):
     def test_complete_campaign_effects_on_off_and_four_schedules_have_identical_gameplay(self):
         pygame.display.init();pygame.font.init();self.addCleanup(pygame.quit)
         screen=pygame.display.set_mode((960,576));reference=None
-        routes=(tuple(('shot',r)for r in OPENING_ROWS+(2,5)),STAGE_TWO_CLEAR,METEOR_CLEAR)
+        routes=(tuple(('shot',r)for r in OPENING_ROWS+(2,5)),STAGE_TWO_CLEAR,DEFENDED_CLEAR)
         for enabled,schedule in ((True,(1/30,)),(True,(1/60,)),(True,(1/144,)),(True,(.007,.041,.013,.09)),(False,(1/60,))):
             game=Game(effects_enabled=enabled);game.running=True;w=game.world;r=Renderer();r.feedback.enabled=enabled
             history=[];times=cycle(schedule);r.update_feedback(w.snapshot(),0,epoch=game._presentation_epoch)
@@ -482,7 +482,9 @@ class EffectsCampaignTests(unittest.TestCase):
                         pygame.event.post(pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=(96,96+48*row)))
                         for event in pygame.event.get():game.handle_event(event)
                     else:
-                        key(pygame.K_2 if kind=='starstorm'else pygame.K_3);key(pygame.K_SPACE)
+                        spell_key={'starstorm':pygame.K_2,'meteor':pygame.K_3,
+                                   'ward':pygame.K_7,'reraise':pygame.K_8}[kind]
+                        key(spell_key);key(pygame.K_SPACE)
                     r.update_feedback(w.snapshot(),0,epoch=game._presentation_epoch)
                     while w.state in (GameState.SHOT_ANIMATION,GameState.SPELL_ANIMATION):
                         dt=next(times);w.advance_time(dt);r.update_feedback(w.snapshot(),dt,epoch=game._presentation_epoch)
@@ -496,7 +498,7 @@ class EffectsCampaignTests(unittest.TestCase):
             self.assertIs(w.state,GameState.VICTORY);key(pygame.K_RETURN)
             r.update_feedback(w.snapshot(),0,epoch=game._presentation_epoch)
             self.assertIs(w.state,GameState.RESULTS)
-            self.assertEqual((w.stage,w.turn_index,w.hp,w.mp,w.bp),(3,22,5,20,5))
+            self.assertEqual((w.stage,w.turn_index,w.hp,w.mp,w.bp),(3,21,50,20,5))
             if reference is None:reference=history
             self.assertEqual(history,reference,(enabled,schedule))
             key(pygame.K_r);r.update_feedback(w.snapshot(),0,epoch=game._presentation_epoch)

@@ -23,7 +23,7 @@ from src.statuses import StatusKind
 from src.world import World
 from stage_one_fixtures import OPENING_ROWS, perform_action
 from stage_two_fixtures import STAGE_TWO_CLEAR
-from stage_three_fixtures import METEOR_CLEAR
+from stage_three_fixtures import DEFENDED_CLEAR
 from test_scenes import world_in_state
 
 
@@ -426,7 +426,7 @@ class ScreenCampaignTests(unittest.TestCase):
     def test_help_intros_pause_terminals_and_real_campaign_are_frame_schedule_invariant(self):
         pygame.display.init(); pygame.font.init(); self.addCleanup(pygame.quit)
         screen = pygame.display.set_mode(LOGICAL_SIZE); renderer = Renderer(); reference = None
-        routes = (tuple(('shot', r) for r in OPENING_ROWS + (2, 5)), STAGE_TWO_CLEAR, METEOR_CLEAR)
+        routes = (tuple(('shot', r) for r in OPENING_ROWS + (2, 5)), STAGE_TWO_CLEAR, DEFENDED_CLEAR)
         for schedule in ((1/30,), (1/60,), (1/144,), (.007, .041, .013, .09)):
             game = Game(); game.running = True; world = game.world; history = []
             def key(value):
@@ -457,7 +457,7 @@ class ScreenCampaignTests(unittest.TestCase):
             before = deepcopy(vars(world))
             for _ in range(4): renderer.draw(screen, world.snapshot()); self.assertFalse(world.resolve_turn())
             self.assertEqual(vars(world), before)
-            self.assertEqual((world.stage, world.turn_index, world.hp, world.mp, world.bp), (3, 22, 5, 20, 5))
+            self.assertEqual((world.stage, world.turn_index, world.hp, world.mp, world.bp), (3, 21, 50, 20, 5))
             if reference is None: reference = history
             self.assertEqual(history, reference, schedule)
             key(pygame.K_r); self.assertIs(world.state, GameState.STAGE_INTRO)

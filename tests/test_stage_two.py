@@ -149,7 +149,7 @@ class StageTwoCampaignTests(unittest.TestCase):
         self.assertEqual(world.snapshot().spawned_waves,1)
         for kind,row in STAGE_TWO_CLEAR:perform_action(world,kind,row,game=game)
         self.assertIs(world.state,GameState.STAGE_CLEAR)
-        self.assertEqual((world.stage,world.turn_index,world.hp,world.mp,world.bp),(2,18,95,60,5))
+        self.assertEqual((world.stage,world.turn_index,world.hp,world.mp,world.bp),(2,13,90,100,5))
         self.assertEqual(len(world.combat.death_events),30)
         self.assertTrue(world.encounter.boss_wave_spawned)
         self.assertEqual(world.encounter.spawn_history[-1],300)
@@ -165,7 +165,7 @@ class StageTwoCampaignTests(unittest.TestCase):
 
     def test_cross_stage_transition_resets_every_owned_system(self):
         world=World();world.start_new_run();world.transition_to(GameState.PLAYER_AIM)
-        for row in OPENING_ROWS:perform_action(world,'shot',row)
+        for row in OPENING_ROWS[:8]:perform_action(world,'shot',row)
         for spell,row in (('fire',2),('starstorm',5),('shot',5)):perform_action(world,spell,row)
         old=world.encounter
         committed_ids=tuple(world.spells._committed_actions)
@@ -207,30 +207,27 @@ class StageTwoCampaignTests(unittest.TestCase):
         for row,target in DEFENSE_AIMS:perform_aimed_shot(world,row,target)
         self.assertIs(world.state,GameState.GAME_OVER)
         self.assertIs(world.game_over_reason,GameOverReason.DEFENSE_FAILED)
-        self.assertEqual((world.hp,world.turn_index,world.mp,world.bp),(27,24,60,5))
-        self.assertTrue(world.enemies[300].escaped);self.assertEqual(world.enemies[300].hp,20)
+        self.assertEqual((world.hp,world.turn_index,world.mp,world.bp),(22,19,100,5))
+        self.assertTrue(world.enemies[300].escaped);self.assertEqual(world.enemies[300].hp,22)
         self.assertEqual(len(world.combat.death_events),29)
         self.assertEqual(world.combat.targets(),())
         self.assertTrue(world.restart());self.assertEqual(world.stage,1)
 
     def test_posted_esuna_and_levitation_resolve_actual_canonical_abilities(self):
-        game=Game();game.running=True;world=game.world
-        game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_RETURN))
-        game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_RETURN))
-        enter_stage_two(world,game=game)
-        for row in (3,0,0):perform_action(world,'shot',row,game=game)
-        for row,target in ((0,(480,456)),(2,(480,72)),(6,(96,384))):
-            perform_aimed_shot(world,row,target,game=game)
+        game=Game();game.running=True
+        world=playing(definition((201,'morbol',0,0),(202,'bulb',0,6)))
+        game.world=world
+        for row in (7,7,7):perform_action(world,'shot',row,game=game)
         self.assertIsNotNone(world.statuses.get(StatusKind.BIND))
         self.assertIsNotNone(world.statuses.get(StatusKind.POISON))
         self.assertTrue(world.hazards.snapshot())
-        self.assertFalse(world.move_player(1));hp=world.hp
-        perform_action(world,'esuna',6,game=game)
+        self.assertFalse(world.move_player(-1));hp=world.hp
+        perform_action(world,'esuna',7,game=game)
         self.assertEqual(world.mp,80);self.assertIsNone(world.statuses.get(StatusKind.BIND))
         self.assertIsNone(world.statuses.get(StatusKind.POISON))
         self.assertEqual(world.hp,hp-5)
-        perform_action(world,'levitation',6,game=game)
-        self.assertEqual(world.mp,60);self.assertEqual(world.hp,hp-10) # Needles, not tile damage.
+        perform_action(world,'levitation',7,game=game)
+        self.assertEqual(world.mp,60);self.assertEqual(world.hp,hp-5)
         self.assertTrue(any(e.kind.value=='hazard_blocked_by_levitation' for e in world.status_events))
 
     def test_stage_two_clear_is_deterministic_across_update_schedules(self):
@@ -272,7 +269,7 @@ class StageTwoCampaignTests(unittest.TestCase):
             if reference is None:reference=history
             self.assertEqual(history,reference,schedule)
             self.assertIs(world.game_over_reason,GameOverReason.DEFENSE_FAILED)
-            self.assertEqual(world.hp,27)
+            self.assertEqual(world.hp,22)
 
     def test_real_status_abilities_are_deterministic_across_update_schedules(self):
         reference=None

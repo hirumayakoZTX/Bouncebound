@@ -48,7 +48,7 @@ class BossModelTests(unittest.TestCase):
         combat = Combat(enemies={100: boss, 1: bomb})
         from src.entities import Crystal
         crystal = Crystal(2, 8, 2);combat.add_crystal(crystal)
-        combat.apply_damage(1, 5)
+        combat.apply_damage(1, 10)
         self.assertEqual(boss.hp, 5)
         self.assertFalse(crystal.collected)
         self.assertEqual(combat.pending_bp, 0)
@@ -94,16 +94,16 @@ class BossCombatIntegrationTests(unittest.TestCase):
     def setUp(self):
         self.world = playing(boss_definition())
 
-    def test_single_orb_hit_deals_five_without_changing_spell_or_player_resources(self):
+    def test_single_orb_hit_deals_four_without_changing_spell_or_player_resources(self):
         self.world.move_player(-1)
         self.world.set_aim_target((96, 192));self.world.fire()
         hits = []
         for _ in range(3):hits.extend(self.world.advance_time(.25))
-        self.assertEqual([(event.target_id, event.damage) for event in hits], [(100, 5)])
-        self.assertEqual(self.world.enemies[100].hp, 10)
+        self.assertEqual([(event.target_id, event.damage) for event in hits], [(100, 4)])
+        self.assertEqual(self.world.enemies[100].hp, 11)
         self.assertEqual((self.world.hp, self.world.mp, self.world.bp, self.world.turn_index), (100, 100, 1, 1))
 
-    def test_three_orbs_can_damage_the_same_boss_independently_in_one_shot(self):
+    def test_three_orbs_damage_the_same_boss_independently_without_killing_it(self):
         self.world.bp = 3  # Isolated collision fixture; full runs earn BP normally.
         self.world.move_player(-1);self.world.set_aim_target((96, 192));self.world.fire()
         hits = []
@@ -111,10 +111,10 @@ class BossCombatIntegrationTests(unittest.TestCase):
         boss_hits = [event for event in hits if event.target_id == 100]
         self.assertEqual(len(boss_hits), 3)
         self.assertEqual({event.projectile_id for event in boss_hits}, {1, 2, 3})
-        self.assertTrue(all(event.damage == 5 for event in boss_hits))
-        self.assertEqual(self.world.enemies[100].hp, 0)
-        self.assertEqual([event.enemy_id for event in self.world.combat.death_events], [100])
-        self.assertNotIn(100, [target.target_id for target in self.world.combat.targets()])
+        self.assertTrue(all(event.damage == 4 for event in boss_hits))
+        self.assertEqual(self.world.enemies[100].hp, 3)
+        self.assertEqual(self.world.combat.death_events, [])
+        self.assertIn(100, [target.target_id for target in self.world.combat.targets()])
 
     def test_fire_targets_nearest_boss_and_charges_unchanged_cost_once(self):
         self.world.move_player(-1);self.world.select_spell('fire')

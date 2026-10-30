@@ -205,7 +205,7 @@ class StageTwoEnemyTests(unittest.TestCase):
             physics=FixedStepPhysics()
             # The production physics callback synchronizes collision and Combat immediately.
             physics.advance(.05,[orb],target_provider=combat.targets,on_hit=combat.handle_hit)
-            self.assertEqual(enemy.hp,enemy.max_hp-5,kind)
+            self.assertEqual(enemy.hp,enemy.max_hp-4,kind)
             combat.apply_damage(1,100,'fixture')
             self.assertEqual(enemy.hp,0);self.assertEqual(combat.targets(),())
             self.assertFalse(combat.apply_damage(1,100))
@@ -224,7 +224,7 @@ class StageTwoEnemyTests(unittest.TestCase):
         for kind in ('cactuar','alligator','bulb','morbol','landtrap','chichu'):
             target=Enemy(2,EnemyType(kind),5,3)
             combat=Combat({1:Enemy(1,EnemyType.BOMB,4,3),2:target})
-            combat.add_crystal(Crystal(3,5,3));combat.apply_damage(1,5)
+            combat.add_crystal(Crystal(3,5,3));combat.apply_damage(1,10)
             self.assertEqual(target.hp,max(0,target.max_hp-10))
             self.assertFalse(combat.crystals[3].collected);self.assertEqual(combat.pending_bp,0)
 

@@ -191,20 +191,27 @@ class EncounterTests(unittest.TestCase):
         self.assertEqual(self.world.spawn_waves(), ())
         self.assertEqual(self.world.encounter.spawned_waves, {0})
 
-    def test_empty_board_with_future_waves_never_clears(self):
+    def test_empty_board_accelerates_one_future_wave_without_an_extra_action(self):
         for enemy_id in tuple(self.world.enemies):
-            self.world.combat.apply_damage(enemy_id, 5)
+            enemy = self.world.enemies[enemy_id]
+            self.world.combat.apply_damage(enemy_id, enemy.max_hp)
         finish_shot(self.world)
         self.assertFalse(self.world.check_stage_end())
         self.world.resolve_turn()
         self.assertEqual(self.world.state, GameState.PLAYER_AIM)
         self.assertEqual(self.world.turn_index, 2)
-        self.assertEqual(self.world.snapshot().enemies, ())
+        self.assertEqual({enemy.enemy_id for enemy in self.world.snapshot().enemies},
+                         {8, 9, 10, 11, 12, 13})
+        self.assertEqual(self.world.snapshot().spawned_waves, 2)
+        self.assertEqual(self.world.enemies[8].turns_alive, 0)
 
     def test_final_kill_clears_only_after_every_projectile_and_effect_finishes(self):
         config = definition(Wave(1, (Spawn(1, "bomb", 4, 3), Spawn(2, "bomb", 5, 3),
                                           Spawn(3, "crystal", 11, 3))))
         world = aiming_world(config)
+        # Keep the two Bombs one ordinary hit from defeat so this test can focus
+        # on waiting for the complete projectile and chain-resolution boundary.
+        world.enemies[1].hp = world.enemies[2].hp = 4
         world.set_aim_target((96, 240))
         world.fire()
         for _ in range(4):
@@ -236,7 +243,7 @@ class EncounterTests(unittest.TestCase):
     def test_pending_combat_and_bp_settle_before_stage_clear(self):
         world = aiming_world(definition(Wave(1, (Spawn(1, "bomb", 4, 3),))))
         finish_shot(world)
-        world.enemies[1].take_damage(5)
+        world.enemies[1].take_damage(10)
         world.combat.pending_deaths.append(DeathEvent(1, EnemyType.BOMB, "projectile"))
         world.combat.pending_bp = 2
         self.assertFalse(world.check_stage_end())
@@ -267,8 +274,11 @@ class EncounterTests(unittest.TestCase):
         world.resolve_turn()
         self.assertIs(world.state, GameState.PLAYER_AIM)
         self.assertEqual(world.hp, 95)
-        self.assertFalse(world.encounter.all_spawned)
+        # The cleared board accelerates the pending wave after the escape.
+        # The escaped mandatory enemy still prevents a successful clear.
+        self.assertTrue(world.encounter.all_spawned)
         self.assertIsNone(world.encounter.outcome(world.combat))
+        self.assertEqual(world.encounter.spawn_history, [1, 2])
         finish_shot(world)
         world.resolve_turn()
         self.assertIn(2, world.enemies)
@@ -314,7 +324,9 @@ class EncounterTests(unittest.TestCase):
         self.assertEqual(self.world.snapshot().crystals, ())
 
     def play_success(self):
-        for row in (3, 3, 2, 2, 4, 4, 3):
+        # Candidate B's 10-HP Bombs require more ordinary shots than the old
+        # one-hit chain route; this historical fixture still clears normally.
+        for row in (3,) * 7:
             finish_shot(self.world, row, full=True)
             self.world.resolve_turn()
 
@@ -415,7 +427,7 @@ class EncounterTests(unittest.TestCase):
         self.assertFalse(world.enemies[1].escaped)
         self.assertIsNone(world.enemies[1].escape_turn)
         self.assertIsNone(world.game_over_reason)
-        self.assertEqual((world.hp, world.enemies[1].hp), (100, 5))
+        self.assertEqual((world.hp, world.enemies[1].hp), (100, 10))
 
     def test_restart_clears_deferred_spawn_progress(self):
         world = World(encounter=PROTOTYPE)

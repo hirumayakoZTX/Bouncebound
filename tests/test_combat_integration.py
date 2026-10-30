@@ -46,13 +46,13 @@ class CombatIntegrationTests(unittest.TestCase):
         orb = Projectile(1, (343, 240), (-520, 0))
         self.install_orbs([orb])
         events = self.world.advance_time(PHYSICS_STEP)
-        self.assertEqual([(event.target_id, event.damage) for event in events], [(1, 5)])
-        self.assertEqual(enemy.hp, 0)
-        self.assertEqual(self.world.combat.targets(), ())
-        self.assertEqual(self.world.snapshot().enemies, ())
+        self.assertEqual([(event.target_id, event.damage) for event in events], [(1, 4)])
+        self.assertEqual(enemy.hp, 1)
+        self.assertEqual(len(self.world.combat.targets()), 1)
+        self.assertEqual(self.world.snapshot().enemies[0].hp, 1)
         self.assertEqual(orb.hits, 1)
 
-    def test_same_step_orbs_use_stable_ids_and_skip_an_enemy_killed_by_first_orb(self) -> None:
+    def test_same_step_orbs_damage_low_hp_target_in_stable_id_order(self) -> None:
         for reverse in (False, True):
             with self.subTest(reverse=reverse):
                 self.world.start_new_run()
@@ -61,14 +61,15 @@ class CombatIntegrationTests(unittest.TestCase):
                 orbs = [Projectile(index, (343, 240), (-520, 0)) for index in (1, 2)]
                 self.install_orbs(list(reversed(orbs)) if reverse else orbs)
                 events = self.world.advance_time(PHYSICS_STEP)
-                self.assertEqual([event.projectile_id for event in events], [1])
+                self.assertEqual([event.projectile_id for event in events], [1, 2])
                 self.assertEqual(orbs[0].velocity, (520, 0))
-                self.assertEqual(orbs[1].velocity, (-520, 0))
-                self.assertEqual([orb.hits for orb in orbs], [1, 0])
+                self.assertEqual(orbs[1].velocity, (520, 0))
+                self.assertEqual([orb.hits for orb in orbs], [1, 1])
                 self.assertEqual(len(self.world.combat.death_events), 1)
 
     def test_dead_enemy_is_not_reused_by_later_substeps_in_the_same_frame(self) -> None:
         self.world.combat.add_enemy(Enemy(1, EnemyType.BASIC, 4, 3))
+        self.world.enemies[1].hp = 4
         orb = Projectile(1, (343, 240), (-520, 0), arena=Bounds(280, 200, 380, 280))
         self.install_orbs([orb])
         events = self.world.advance_time(0.25)
@@ -77,7 +78,9 @@ class CombatIntegrationTests(unittest.TestCase):
         self.assertAlmostEqual(orb.position[0], 301)
 
     def test_bomb_chain_removes_targets_even_within_one_orb_substep(self) -> None:
-        for enemy in (Enemy(1, EnemyType.BOMB, 4, 3), Enemy(2, EnemyType.BOMB, 5, 3)):
+        source = Enemy(1, EnemyType.BOMB, 4, 3)
+        source.hp = 4  # Prior attacks left the source Bomb one orb hit from defeat.
+        for enemy in (source, Enemy(2, EnemyType.BOMB, 5, 3)):
             self.world.combat.add_enemy(enemy)
         orb = Projectile(1, (281, 240), (100_000, 0))
         self.install_orbs([orb])
@@ -88,7 +91,9 @@ class CombatIntegrationTests(unittest.TestCase):
         self.assertTrue(all(not enemy.alive for enemy in self.world.enemies.values()))
 
     def test_simultaneous_contacts_skip_a_neighbor_killed_by_the_first_bomb(self) -> None:
-        self.world.combat.add_enemy(Enemy(1, EnemyType.BOMB, 4, 3))
+        source = Enemy(1, EnemyType.BOMB, 4, 3)
+        source.hp = 4
+        self.world.combat.add_enemy(source)
         self.world.combat.add_enemy(Enemy(2, EnemyType.BOMB, 4, 4))
         orb = Projectile(1, (281, 264), (520, 0))
         self.install_orbs([orb])
@@ -104,14 +109,14 @@ class CombatIntegrationTests(unittest.TestCase):
         orb = Projectile(1, (343 + 520 * PHYSICS_STEP, 240), (-520, 0))
         self.install_orbs([orb])
         self.world.advance_time(PHYSICS_STEP)
-        self.assertEqual(enemy.hp, 10)
+        self.assertEqual(enemy.hp, 11)
         orb.velocity = (0, 0)
         self.world.advance_time(0.1)
-        self.assertEqual(enemy.hp, 10)
+        self.assertEqual(enemy.hp, 11)
         orb.velocity = (520, 0)
         for _ in range(8):
             self.world.advance_time(0.25)
-        self.assertEqual(enemy.hp, 5)
+        self.assertEqual(enemy.hp, 7)
         self.assertEqual(orb.hits, 2)
 
     def test_false_positive_contact_fix_still_prevents_combat_damage(self) -> None:
@@ -247,6 +252,7 @@ class CombatIntegrationTests(unittest.TestCase):
         world.set_aim_target((96, 240))
         world.fire()
         world.projectiles[0].max_hits = 1
+        world.enemies[2].hp = 4  # Prior attacks leave this Bomb one orb hit from defeat.
         for _ in range(4):
             world.advance_time(0.25)
         self.assertIs(world.state, GameState.TURN_RESOLVE)

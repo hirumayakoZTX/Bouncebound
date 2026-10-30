@@ -161,37 +161,54 @@ class Encounter:
     spawn_history: list[int] = field(default_factory=list, init=False)
     boss_wave_spawned: bool = field(default=False, init=False)
 
-    def spawn_due(self, turn: int, combat: Combat) -> tuple[int, ...]:
+    def spawn_due(self, turn: int, combat: Combat, *,
+                  accelerate_if_empty: bool = False) -> tuple[int, ...]:
         """Retry due entries in wave/config order; occupied enemy cells wait.
 
-        The World calls this only at safe turn boundaries. Crystals are
-        nonblocking collectibles and may share cells with enemies.
+        The World calls this only at safe turn boundaries. When requested, one
+        next unspawned wave may be accelerated if no scheduled entries spawned
+        and the enemy field is empty. Crystals are nonblocking collectibles
+        and may share cells with enemies.
         """
         spawned = []
         for index, wave in enumerate(self.definition.waves):
             if wave.turn > turn:
                 break
-            for spawn in wave.spawns:
-                if spawn.entity_id in self.spawned_ids:
-                    continue
-                if spawn.kind == "crystal":
-                    combat.add_crystal(Crystal(spawn.entity_id, spawn.col, spawn.row))
-                else:
-                    if (self.definition.capacity is not None
-                            and sum(enemy.active for enemy in combat.enemies.values())
-                            >= self.definition.capacity):
-                        continue
-                    if any(enemy.active and (enemy.grid_col, enemy.grid_row)
-                           == (spawn.col, spawn.row) for enemy in combat.enemies.values()):
-                        continue
-                    combat.add_enemy(Enemy(spawn.entity_id, EnemyType(spawn.kind),
-                                           spawn.col, spawn.row))
-                self.spawned_ids.add(spawn.entity_id)
-                self.spawn_history.append(spawn.entity_id)
-                spawned.append(spawn.entity_id)
-            if all(spawn.entity_id in self.spawned_ids for spawn in wave.spawns):
-                self.spawned_waves.add(index)
+            spawned.extend(self._spawn_wave(index, combat))
+        if (accelerate_if_empty and not spawned
+                and not any(enemy.active for enemy in combat.enemies.values())
+                and not combat.pending_deaths and not combat.pending_bp):
+            next_index = next((index for index in range(len(self.definition.waves))
+                               if index not in self.spawned_waves), None)
+            if next_index is not None:
+                spawned.extend(self._spawn_wave(next_index, combat))
         spawned.extend(self.spawn_boss_wave(combat))
+        return tuple(spawned)
+
+    def _spawn_wave(self, index: int, combat: Combat) -> tuple[int, ...]:
+        """Publish entries for one configured wave in stable order."""
+        wave = self.definition.waves[index]
+        spawned = []
+        for spawn in wave.spawns:
+            if spawn.entity_id in self.spawned_ids:
+                continue
+            if spawn.kind == "crystal":
+                combat.add_crystal(Crystal(spawn.entity_id, spawn.col, spawn.row))
+            else:
+                if (self.definition.capacity is not None
+                        and sum(enemy.active for enemy in combat.enemies.values())
+                        >= self.definition.capacity):
+                    continue
+                if any(enemy.active and (enemy.grid_col, enemy.grid_row)
+                       == (spawn.col, spawn.row) for enemy in combat.enemies.values()):
+                    continue
+                combat.add_enemy(Enemy(spawn.entity_id, EnemyType(spawn.kind),
+                                       spawn.col, spawn.row))
+            self.spawned_ids.add(spawn.entity_id)
+            self.spawn_history.append(spawn.entity_id)
+            spawned.append(spawn.entity_id)
+        if all(spawn.entity_id in self.spawned_ids for spawn in wave.spawns):
+            self.spawned_waves.add(index)
         return tuple(spawned)
 
     def spawn_boss_wave(self, combat: Combat) -> tuple[int, ...]:

@@ -197,10 +197,10 @@ class TurnTests(unittest.TestCase):
         self.finish_shot()
         self.world.resolve_turn()
         self.assertTrue(bomb.escaped)
-        self.assertEqual((bomb.hp, follower.hp, follower.grid_col), (5, 5, 13))
+        self.assertEqual((bomb.hp, follower.hp, follower.grid_col), (10, 5, 13))
         self.assertEqual(self.world.combat.death_events, [])
         self.assertFalse(self.world.combat.apply_damage(bomb.enemy_id, 100))
-        self.assertEqual(bomb.hp, 5)
+        self.assertEqual(bomb.hp, 10)
         self.assertEqual(self.world.combat.death_events, [])
 
     def test_later_explosion_cannot_damage_an_archived_escape(self) -> None:
@@ -208,8 +208,8 @@ class TurnTests(unittest.TestCase):
         bomb = self.add_enemy(2, 12, 4, EnemyType.BOMB)
         self.finish_shot()
         self.world.resolve_turn()
-        self.world.combat.apply_damage(bomb.enemy_id, 5)
-        self.assertEqual(escaped.hp, 5)
+        self.world.combat.apply_damage(bomb.enemy_id, 10)
+        self.assertEqual(escaped.hp, 10)
         self.assertTrue(escaped.escaped)
         self.assertEqual([event.enemy_id for event in self.world.combat.death_events], [2])
 
@@ -316,7 +316,7 @@ class TurnTests(unittest.TestCase):
         self.add_enemy(2, 6, 3, EnemyType.BOMB)
         survivor = self.add_enemy(3, 0, 5)
         self.world.combat.add_crystal(Crystal(4, 0, 6))
-        self.world.combat.apply_damage(1, 5)
+        self.world.combat.apply_damage(1, 10)
         self.world.combat.handle_hit(HitEvent(1, 4, 0, (120, 384), (1, 0)))
         self.finish_shot()
 

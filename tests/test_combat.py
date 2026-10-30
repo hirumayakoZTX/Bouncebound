@@ -17,7 +17,9 @@ class CombatTests(unittest.TestCase):
         for kind, score in ((EnemyType.BASIC, 100), (EnemyType.BOMB, 200)):
             with self.subTest(kind=kind):
                 enemy = Enemy(1, kind, 2, 3)
-                self.assertEqual((enemy.hp, enemy.max_hp, enemy.contact_damage), (5, 5, 5))
+                expected_hp = 10 if kind is EnemyType.BOMB else 5
+                self.assertEqual((enemy.hp, enemy.max_hp, enemy.contact_damage),
+                                 (expected_hp, expected_hp, 5))
                 self.assertEqual(enemy.score_value, score)
                 self.assertTrue(enemy.alive)
 
@@ -69,7 +71,7 @@ class CombatTests(unittest.TestCase):
             2: Enemy(2, EnemyType.BOMB, 5, 3),
             3: Enemy(3, EnemyType.BASIC, 6, 4),
         })
-        combat.handle_hit(hit(1))
+        combat.handle_hit(hit(1, 10))
         self.assertTrue(all(not enemy.alive and enemy.hp == 0 for enemy in combat.enemies.values()))
         self.assertEqual([event.enemy_id for event in combat.death_events], [1, 2, 3])
         self.assertEqual([event.source for event in combat.death_events],
@@ -87,7 +89,7 @@ class CombatTests(unittest.TestCase):
             combat.add_enemy(Enemy(enemy_id, EnemyType.BASIC, col, row))
         combat.add_enemy(Enemy(10, EnemyType.BASIC, 5, 3))
         combat.add_enemy(Enemy(11, EnemyType.BASIC, 7, 3))
-        combat.apply_damage(1, 5)
+        combat.apply_damage(1, 10)
         self.assertTrue(all(not combat.enemies[enemy_id].alive for enemy_id in range(1, 10)))
         self.assertTrue(combat.enemies[10].alive)
         self.assertTrue(combat.enemies[11].alive)
@@ -97,7 +99,7 @@ class CombatTests(unittest.TestCase):
         neighbor = Enemy(2, EnemyType.BASIC, 5, 3)
         neighbor.hp = neighbor.max_hp = 15
         combat = Combat(enemies={1: bomb, 2: neighbor})
-        combat.apply_damage(1, 5)
+        combat.apply_damage(1, 10)
         self.assertEqual(neighbor.hp, 5)
         self.assertTrue(neighbor.alive)
 
@@ -110,7 +112,7 @@ class CombatTests(unittest.TestCase):
             5: Enemy(5, EnemyType.BASIC, 13, 0),
             6: Enemy(6, EnemyType.BASIC, 0, 7),
         })
-        combat.apply_damage(1, 5)
+        combat.apply_damage(1, 10)
         self.assertEqual([event.enemy_id for event in combat.death_events], [1, 2, 3, 4])
         self.assertTrue(combat.enemies[5].alive)
         self.assertTrue(combat.enemies[6].alive)
@@ -122,7 +124,7 @@ class CombatTests(unittest.TestCase):
         histories = []
         for order in (entries, list(reversed(entries))):
             combat = Combat(enemies={item[0]: Enemy(*item) for item in order})
-            combat.apply_damage(10, 5)
+            combat.apply_damage(10, 10)
             histories.append(combat.death_events)
         self.assertEqual(histories[0], histories[1])
         self.assertEqual([event.enemy_id for event in histories[0]], [10, 2, 7, 1, 3])
@@ -132,7 +134,7 @@ class CombatTests(unittest.TestCase):
             row * 14 + col + 1: Enemy(row * 14 + col + 1, EnemyType.BOMB, col, row)
             for row in range(8) for col in range(14)
         })
-        combat.apply_damage(1, 5)
+        combat.apply_damage(1, 10)
         self.assertEqual(len(combat.death_events), 112)
         self.assertEqual(len({event.enemy_id for event in combat.death_events}), 112)
         self.assertFalse(combat.pending_deaths)

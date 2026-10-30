@@ -192,15 +192,13 @@ class SpellUITests(unittest.TestCase):
 
     def test_restart_from_stage_clear_resets_ui_and_action_sequence(self):
         # Ordinary controls, including Fire as the final action.
-        for turn, row in enumerate((3, 3, 2, 2, 4, 4, 3), start=1):
+        for turn, row in enumerate((3, 3, 2, 2, 4, 3, 3), start=1):
             while self.game.world.player_row != row:
                 self.key(pygame.K_DOWN if self.game.world.player_row < row else pygame.K_UP)
-            if turn == 7:
-                self.key(pygame.K_1)
-                self.key(pygame.K_SPACE)
-            else:
-                self.click((96, 96 + 48 * row))
+            self.click((96, 96 + 48 * row))
             finish_action(self.game.world)
+            if self.game.world.state is GameState.STAGE_CLEAR:
+                break
         self.assertIs(self.game.world.state, GameState.STAGE_CLEAR)
         before = deepcopy(vars(self.game.world))
         self.key(pygame.K_8)
@@ -216,7 +214,7 @@ class SpellUITests(unittest.TestCase):
 
     def test_full_prototype_mixed_spells_and_shots_use_one_action_each_turn(self):
         owner = self.game.world
-        for turn, row in enumerate((3, 3, 2, 2, 4, 4, 3), start=1):
+        for turn, row in enumerate((3, 3, 2, 2, 4, 3, 3), start=1):
             self.assertEqual(owner.turn_index, turn)
             while owner.player_row != row:
                 self.key(pygame.K_DOWN if owner.player_row < row else pygame.K_UP)
@@ -229,7 +227,7 @@ class SpellUITests(unittest.TestCase):
                 self.key(pygame.K_SPACE)
                 self.assertEqual(owner.spell_feedback, 'Not enough MP')
                 self.assertEqual(owner.mp, 40)
-            if turn in (1, 7):
+            if turn == 1:
                 self.key(pygame.K_1)
                 self.key(pygame.K_SPACE)
             elif turn == 2:
@@ -239,7 +237,7 @@ class SpellUITests(unittest.TestCase):
                 self.click((96, 96 + 48 * row))
             finish_action(owner)
         self.assertIs(owner.state, GameState.STAGE_CLEAR)
-        self.assertEqual((owner.turn_index, owner.hp, owner.mp, owner.bp), (7, 100, 10, 4))
+        self.assertEqual((owner.turn_index, owner.hp, owner.mp, owner.bp), (7, 100, 40, 5))
         self.assertEqual(len(owner.combat.death_events), 24)
         self.assertEqual(owner.encounter.spawned_waves, {0, 1, 2, 3})
         self.assertIsNone(owner.snapshot().pending_action)

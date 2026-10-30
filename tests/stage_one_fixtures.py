@@ -7,8 +7,8 @@ from src.states import GameState
 from src.world import STAGE_ONE, World
 
 
-OPENING_ROWS = (3, 3, 2, 2, 4, 4, 1, 1, 5)
-DEFENSE_ROWS = (0,) * 12 + (1, 4, 1)
+OPENING_ROWS = (3, 3, 2, 2, 4, 2, 1, 5)
+DEFENSE_ROWS = (0,) * 12 + (1, 4, 1) + (0,) * 5
 
 
 def boss_definition(*, scripted=False, col=7, rows=(2, 5), reverse=False, capacity=25):
@@ -78,4 +78,4 @@ def perform_action(world, kind, row, schedule=(.25,), *, game=None, resolve=True
 def clear_ordinary_waves(world, schedule=(.25,), *, game=None):
     for row in OPENING_ROWS:
         perform_action(world, 'shot', row, schedule, game=game)
-    assert world.turn_index == 10 and world.encounter.boss_wave_spawned
+    assert world.turn_index == 9 and world.encounter.boss_wave_spawned

@@ -62,8 +62,9 @@ class CanonicalStageOneTests(unittest.TestCase):
         self.assertEqual(world.spawn_waves(), ())
         self.assertFalse(world.resolve_turn())
         world.resume();self.assertTrue(world.resolve_turn())
-        self.assertEqual(world.turn_index, 10)
-        self.assertEqual(world.encounter.spawn_history, list(range(1, 34)) + [100, 101])
+        self.assertEqual(world.turn_index, 9)
+        self.assertEqual(world.encounter.spawn_history,
+                         list(range(1, 10)) + [11, 10] + list(range(12, 34)) + [100, 101])
         self.assertTrue(world.encounter.boss_wave_spawned)
         self.assertEqual(world.hp, 100)
         self.assertTrue(all(world.enemies[key].turns_alive == 0 for key in (100, 101)))
@@ -123,7 +124,7 @@ class CanonicalStageOneTests(unittest.TestCase):
         self.assertTrue(world.encounter.all_spawned)
         self.assertTrue(all(not world.enemies[key].alive for key in world.encounter.definition.mandatory_ids))
 
-    def test_mixed_normal_actions_clear_on_turn_twelve_without_extra_boss_attack(self):
+    def test_mixed_normal_actions_clear_on_turn_eleven_without_extra_boss_attack(self):
         world = playing();clear_ordinary_waves(world)
         self.assertEqual((world.hp,world.bp), (100,5))
         perform_action(world, 'fire', 2)
@@ -134,10 +135,10 @@ class CanonicalStageOneTests(unittest.TestCase):
         self.assertEqual((world.hp,world.mp), (90,30))
         self.assertEqual(world.enemies[101].hp, 5)
         hits = perform_action(world, 'shot', 5)
-        self.assertTrue(any(event.target_id == 101 and event.damage == 5 for event in hits))
+        self.assertTrue(any(event.target_id == 101 and event.damage == 4 for event in hits))
         self.assertIs(world.state, GameState.STAGE_CLEAR)
-        self.assertEqual((world.turn_index,world.hp,world.mp,world.bp), (12,90,30,5))
-        self.assertEqual(world.last_resolved_turn, 11)
+        self.assertEqual((world.turn_index,world.hp,world.mp,world.bp), (11,90,30,5))
+        self.assertEqual(world.last_resolved_turn, 10)
         self.assertEqual(len(world.combat.death_events), 30)
         self.assertEqual(len({event.enemy_id for event in world.combat.death_events}), 30)
         self.assertEqual([event.enemy_id for event in world.combat.death_events[-2:]], [100,101])
@@ -153,7 +154,7 @@ class CanonicalStageOneTests(unittest.TestCase):
         self.assertGreaterEqual(len([hit for hit in first if hit.target_id == 100]), 3)
         perform_action(world, 'shot', 5)
         self.assertIs(world.state, GameState.STAGE_CLEAR)
-        self.assertEqual((world.turn_index,world.hp,world.mp,world.bp), (11,95,100,5))
+        self.assertEqual((world.turn_index,world.hp,world.mp,world.bp), (10,95,100,5))
 
     def test_hp_defeat_is_reachable_with_ordinary_missed_shots(self):
         world = playing()
@@ -171,11 +172,11 @@ class CanonicalStageOneTests(unittest.TestCase):
         for row in DEFENSE_ROWS:perform_action(world, 'shot', row)
         self.assertIs(world.state, GameState.GAME_OVER)
         self.assertIs(world.game_over_reason, GameOverReason.DEFENSE_FAILED)
-        self.assertEqual((world.hp,world.turn_index,world.mp), (85,15,100))
+        self.assertEqual((world.hp,world.turn_index,world.mp), (45,20,100))
         self.assertTrue(world.encounter.all_spawned)
         self.assertFalse(world.encounter.boss_wave_spawned)
         self.assertFalse(any(enemy.active for enemy in world.enemies.values()))
-        self.assertEqual((len(world.combat.death_events),sum(e.escaped for e in world.enemies.values())), (25,3))
+        self.assertEqual((len(world.combat.death_events),sum(e.escaped for e in world.enemies.values())), (17,11))
 
     def test_boss_stage_clear_precedes_due_poison_doom_and_hazards(self):
         world = playing();clear_ordinary_waves(world)
@@ -255,7 +256,7 @@ class CanonicalStageOneTests(unittest.TestCase):
 
     def test_prototype_still_has_its_original_clear_path_and_no_boss_group(self):
         world = playing(PROTOTYPE)
-        for row in (3,3,2,2,4,4,3):perform_action(world,'shot',row)
+        for row in (3,)*7:perform_action(world,'shot',row)
         self.assertIs(world.state, GameState.STAGE_CLEAR)
         self.assertEqual((world.turn_index,world.hp,world.mp,world.bp), (7,100,100,5))
         self.assertFalse(world.snapshot().has_boss_wave)
@@ -305,7 +306,7 @@ class CanonicalStageOneTests(unittest.TestCase):
         self.assertIs(world.validate_spell('meteor').failure,SpellFailure.STAGE_LOCKED)
         self.assertFalse(world.select_spell('meteor'))
         self.assertIsNone(world._pending_action)
-        self.assertEqual((world.hp,world.mp,world.turn_index),(100,100,10))
+        self.assertEqual((world.hp,world.mp,world.turn_index),(100,100,9))
 
 
 if __name__ == '__main__':

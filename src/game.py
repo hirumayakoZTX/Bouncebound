@@ -68,6 +68,9 @@ class Game:
         elif event.key == pygame.K_r and not getattr(event, "repeat", False):
             if self.world.restart():
                 self._presentation_epoch += 1
+        elif event.key == pygame.K_t and not getattr(event, "repeat", False):
+            if self.world.retry_current_stage():
+                self._presentation_epoch += 1
         elif event.key == pygame.K_ESCAPE:
             if self.world.state is GameState.MENU:
                 self.running = False
