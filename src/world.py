@@ -100,6 +100,7 @@ class WorldSnapshot:
     spell_remaining: float = 0.0
     spell_result: OffensiveSpellResult | SupportSpellResult | None = None
     next_stage_available: bool = False
+    retry_stage_available: bool = False
     has_boss_wave: bool = False
     boss_wave_spawned: bool = False
     bosses_remaining: int = 0
@@ -249,6 +250,23 @@ class World:
                 and self.stage + 1 in self._stage_definitions
                 and self._pending_action is None and not self.projectiles)
 
+    @property
+    def can_retry_current_stage(self) -> bool:
+        """Whether Game Over can restart this registered later-stage encounter."""
+        definition = self._stage_definitions.get(self.stage)
+        return (self.state is GameState.GAME_OVER and self.game_over_reason is not None
+                and self.stage > 1 and definition is not None
+                and self.encounter is not None
+                and self.encounter.definition == definition
+                and self.encounter.definition.stage == self.stage)
+
+    def _start_stage_attempt(self, definition: EncounterDefinition) -> bool:
+        """Create one clean stage attempt, leaving its first wave for the intro."""
+        self.reset()
+        self.stage = definition.stage
+        self.encounter = Encounter(definition)
+        return self.transition_to(GameState.STAGE_INTRO)
+
     def advance_stage(self) -> bool:
         """Enter a registered next encounter after an authorized clear.
 
@@ -259,10 +277,14 @@ class World:
         if not self.can_advance_stage:
             return False
         definition = self._stage_definitions[self.stage + 1]
-        self.reset()
-        self.stage = definition.stage
-        self.encounter = Encounter(definition)
-        return self.transition_to(GameState.STAGE_INTRO)
+        return self._start_stage_attempt(definition)
+
+    def retry_current_stage(self) -> bool:
+        """Restart a defeated later stage from its intro and first wave."""
+        if not self.can_retry_current_stage:
+            return False
+        definition = self._stage_definitions[self.stage]
+        return self._start_stage_attempt(definition)
 
     def start_new_run(self) -> None:
         self.reset()
@@ -634,6 +656,7 @@ class World:
             spell_remaining=self._spell_remaining,
             spell_result=self.last_spell_result,
             next_stage_available=self.can_advance_stage,
+            retry_stage_available=self.can_retry_current_stage,
             has_boss_wave=self.encounter is not None and self.encounter.definition.boss_wave is not None,
             boss_wave_spawned=self.encounter.boss_wave_spawned if self.encounter else False,
             bosses_remaining=sum(enemy.active and enemy.is_boss for enemy in self.enemies.values()),

@@ -70,6 +70,8 @@ By default, audio hardware is not initialized or required.
 - **R** at Stage Clear, Game Over, Victory, or Results restarts the entire run at
   Stage 1 Intro. Restart is disabled during active gameplay. Held Enter repeats
   do not skip introductions or acknowledge terminal screens.
+- **T** at a Stage 2 or Stage 3 Game Over retries that stage from Wave 1. It
+  returns to that stage's introduction without replaying earlier stages.
 
 New runs begin at Stage 1, Turn 1, with HP 100/100, MP 100/100, and BP 1.
 HP tracks player health; MP pays spell costs and does not regenerate passively.
@@ -311,13 +313,19 @@ Stage Clear shows the cleared stage, turn, HP, MP, and BP. Enter: Next Stage is
 shown only when advancement is authorized and the next stage exists. Game Over
 shows the actual failure reason: depleted HP or a required enemy escaping the
 defense line. Defense failure can occur with positive HP and never offers stage
-advancement. Both screens offer R: Restart Run.
+advancement. Stage 2 and Stage 3 Game Over screens offer **T: Retry Current
+Stage** and **R: Restart Campaign**; Stage 1 offers the campaign restart.
 
 The third stage ends in Victory. Enter opens Results with the final stage, turn,
 and remaining resources. Its `Score: —` placeholder is unavailable data, not a
 numerical score; no kill totals, bonuses, records, or save files are fabricated.
 R from Stage Clear, Game Over, Victory, or Results returns to a fresh Stage 1
-Intro through the full campaign reset. R does not restart active gameplay.
+Intro through the full campaign reset. T retries a later failed stage through
+its introduction, resetting HP, MP, BP, turn, cooldowns, statuses, hazards,
+wave and boss progress, and stage-local combat history before Wave 1. No earlier
+stage needs to be replayed. Retry state is in-memory only; there are no checkpoints
+or save/load functionality between application sessions. Neither key restarts
+active gameplay.
 
 All screens work without optional artwork or an audio device. The menu uses the
 original guardian sprite when available and a procedural crest otherwise.

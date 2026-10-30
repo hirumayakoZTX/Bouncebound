@@ -56,8 +56,9 @@ INSTRUCTION_CARDS = (
             'Stage 3 ends in Victory.', 'Enter on Victory: Results.',
         )),
         ('Pause, restart and back', (
-            'Escape: pause/resume during gameplay.', 'R: restart from Stage Clear, Game Over,',
-            'Victory or Results; return to Stage 1.', 'Escape / Backspace: close this guide.',
+            'Escape: pause/resume during gameplay.', 'T: retry Stage 2/3 from Game Over.',
+            'R: restart from supported end screens.', 'Returns to Stage 1; no checkpoints.',
+            'Escape / Backspace: close this guide.',
         )),
     ),
 )
@@ -266,6 +267,21 @@ class ScreenRenderer:
         elif state is GameState.VICTORY:
             self._hint(screen, 'Enter: Results', (256, 440, 448, 44))
             self._hint(screen, 'R: Restart Run', (256, 496, 448, 40))
+        elif state is GameState.GAME_OVER and snapshot.retry_stage_available:
+            retry = self._panel(screen, (112, 446, 360, 82), color=HARMFUL)
+            self._text(screen, f'T: Retry Stage {snapshot.stage}',
+                       (retry.x + 12, retry.y + 10), width=retry.w - 24,
+                       font='body', color=HARMFUL, centered=True)
+            self._text(screen, 'Restart this stage from Wave 1',
+                       (retry.x + 12, retry.y + 48), width=retry.w - 24,
+                       font='small', color=TEXT, centered=True)
+            restart = self._panel(screen, (488, 446, 360, 82), color=ACCENT)
+            self._text(screen, 'R: Restart Campaign',
+                       (restart.x + 12, restart.y + 10), width=restart.w - 24,
+                       font='body', color=ACCENT, centered=True)
+            self._text(screen, 'Return to Stage 1',
+                       (restart.x + 12, restart.y + 48), width=restart.w - 24,
+                       font='small', color=TEXT, centered=True)
         else:
             if state is GameState.STAGE_CLEAR:
                 self._text(screen, 'No next stage is available.', (128, 438), width=704,
