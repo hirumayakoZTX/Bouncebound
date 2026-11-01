@@ -171,9 +171,9 @@ class CombatHUD:
     def _progress(self, screen: pygame.Surface, snapshot: WorldSnapshot) -> None:
         rect = self._panel(screen, PROGRESS_PANEL)
         self._text(screen, f'Stage {snapshot.stage}  Turn {snapshot.turn_index}',
-                   (rect.x + 10, rect.y + 8), width=174, font='heading')
-        self._text(screen, 'Score: —', (rect.x + 198, rect.y + 10), width=72,
-                   font='body', color=MUTED)
+                   (rect.x + 10, rect.y + 8), width=145, font='heading')
+        self._text(screen, f'Score: {snapshot.score.total}', (rect.x + 156, rect.y + 10),
+                   width=114, font='small', color=TEXT)
         wave = f'Waves {snapshot.spawned_waves}/{snapshot.total_waves}' if snapshot.total_waves else 'Waves: —'
         if snapshot.has_boss_wave:
             wave += (f' | Bosses alive {snapshot.bosses_remaining}/{snapshot.boss_total}'

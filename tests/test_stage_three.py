@@ -157,8 +157,11 @@ class StageThreeCampaignTests(unittest.TestCase):
         game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_RETURN))
         self.assertIs(w.state,GameState.RESULTS)
         self.assertEqual((w.hp,w.mp,w.bp,w.stage,w.turn_index),(50,20,5,3,21))
+        self.assertEqual(w.snapshot().score.total,30750)
+        self.assertEqual(sum(event.points for event in w.snapshot().score.events),30750)
         game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_r))
         self.assertEqual((w.stage,w.state,w.hp,w.mp,w.bp),(1,GameState.STAGE_INTRO,100,100,1))
+        self.assertEqual(w.snapshot().score.total,0)
         self.assertEqual(w.encounter.definition,STAGE_ONE)
         self.assertEqual(w.status_events,());self.assertEqual(w.spells.cooldowns,{})
         game.handle_event(pygame.event.Event(pygame.QUIT));self.assertFalse(game.running)
@@ -341,10 +344,10 @@ class StageThreeCampaignTests(unittest.TestCase):
         for text in ('Mn10','D12','T!17','G15','O50','! DOOM 5t','Stage 3 | Turn 1',
                      'HP 100/100','MP 100/100','BP 1/5','Enter: Results','R: Restart Run'):
             self.assertIn(text,texts)
-        self.assertIn('Score: —',texts)
-        self.assertFalse(hasattr(snap,'score'))
+        self.assertIn(f'Score: {snap.score.total}',texts)
+        self.assertGreater(snap.score.total, 0)
 
-    def test_no_scoring_or_save_files_are_created_by_campaign_actions(self):
+    def test_scoring_creates_no_save_files(self):
         previous=Path.cwd()
         with tempfile.TemporaryDirectory() as directory:
             try:

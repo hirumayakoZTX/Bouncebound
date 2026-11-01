@@ -17,6 +17,7 @@ from src.assets import AssetManager
 from src.constants import LOGICAL_SIZE, WINDOW_TITLE
 from src.game import Game
 from src.renderer import Renderer
+from src.scoring import ScoreBreakdown, ScoreSnapshot
 from src.screens import ScreenRenderer, SCREEN_CACHE_LIMIT, INSTRUCTION_CARDS, INSTRUCTION_BOUNDS, FRAME
 from src.states import ACTIVE_STATES, GameState, GameOverReason, INSTRUCTION_PAGE_COUNT
 from src.statuses import StatusKind
@@ -309,11 +310,17 @@ class ScreenDrawingTests(unittest.TestCase):
                 self.assertIn(text, labels)
             self.assertEqual('Enter: Results' in labels, state is GameState.VICTORY)
 
-    def test_results_score_is_unavailable_without_fabricated_statistics(self):
+    def test_results_displays_score_breakdown_without_records(self):
         labels = self.labels(self.snapshot(GameState.RESULTS, stage=3))
-        self.assertIn('Score: —', labels)
-        self.assertFalse(hasattr(self.world.snapshot(), 'score'))
-        self.assertFalse(any('High score' in t or 'Bonus' in t or 'Kills' in t for t in labels))
+        self.assertIn('Score: 0', labels)
+        self.assertIn('Enemy defeats: 0', labels)
+        self.assertIn('Stage bonuses: 0', labels)
+        self.assertFalse(any('High score' in t for t in labels))
+        score = ScoreSnapshot(ScoreBreakdown(21300, 1850, 1600, 6000))
+        labels = self.labels(self.snapshot(GameState.RESULTS, stage=3, score=score))
+        for text in ('Score: 30750', 'Enemy defeats: 21300', 'Bomb chains: 1850',
+                     'Shot combos: 1600', 'Stage bonuses: 6000'):
+            self.assertIn(text, labels)
 
     def test_pause_covers_center_but_preserves_hud_and_visible_field_edges(self):
         self.world.start_new_run(); self.world.transition_to(GameState.PLAYER_AIM)

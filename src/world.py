@@ -32,6 +32,7 @@ from src.support_spells import SupportSpellResult, execute_support
 from src.player_actions import (
     ActionKind, MainAction, SpellHUD, SPELL_ANIMATION_SECONDS, spell_failure_message,
 )
+from src.scoring import ScoreManager, ScoreSnapshot
 
 
 STAGE_ONE = load_stage("stage_01.json")
@@ -107,6 +108,7 @@ class WorldSnapshot:
     boss_total: int = 0
     instructions_page: int = 0
     combat_observations: tuple[CombatObservation, ...] = ()
+    score: ScoreSnapshot = ScoreSnapshot()
 
 
 class World:
@@ -166,6 +168,9 @@ class World:
         self.spells = SpellEngine()
         self.statuses = StatusState()
         self.hazards = HazardState()
+        self.score = ScoreManager()
+        self._score_death_cursor = 0
+        self._shot_targets: set[int] = set()
         self.reraise_used = False
         self.bp = 1
         self.player_row = INITIAL_PLAYER_ROW
@@ -262,7 +267,10 @@ class World:
 
     def _start_stage_attempt(self, definition: EncounterDefinition) -> bool:
         """Create one clean stage attempt, leaving its first wave for the intro."""
+        score = self.score
         self.reset()
+        score.begin_attempt(definition.stage)
+        self.score = score
         self.stage = definition.stage
         self.encounter = Encounter(definition)
         return self.transition_to(GameState.STAGE_INTRO)
@@ -418,6 +426,7 @@ class World:
                             for index, velocity in enumerate(velocities)]
         self._next_projectile_id += len(velocities)
         self._physics.accumulator = 0.0
+        self._shot_targets.clear()
         action_id, sequence = self._action_id()
         self._pending_action = MainAction(action_id, ActionKind.SHOT, self.turn_index)
         self._next_action_id = sequence + 1
@@ -446,15 +455,32 @@ class World:
         events = self._physics.advance(
             dt, self.projectiles,
             target_provider=lambda: self.combat.targets() + targets,
-            on_hit=self.combat.handle_hit,
+            on_hit=self._handle_projectile_hit,
             on_bounce=self.combat.observe_bounce,
         )
         self.projectiles = [orb for orb in self.projectiles if orb.active]
         if not self.projectiles:
             self.bp = self.combat.finish_shot(self.bp)
+            self._sync_score_deaths()
+            self.score.complete_shot(action.action_id, self._shot_targets)
             self._pending_action = replace(action, completed=True)
             self.transition_to(GameState.TURN_RESOLVE)
         return events
+
+    def _sync_score_deaths(self) -> None:
+        """Consume the authoritative, unbounded Combat death archive once."""
+        events = self.combat.death_events
+        for event in events[self._score_death_cursor:]:
+            self.score.record_death(event.enemy_id, self.enemies[event.enemy_id].score_value,
+                                    event.source)
+        self._score_death_cursor = len(events)
+
+    def _handle_projectile_hit(self, event: HitEvent) -> None:
+        enemy = self.enemies.get(event.target_id)
+        if enemy is not None and enemy.active and event.damage > 0:
+            self._shot_targets.add(event.target_id)
+        self.combat.handle_hit(event)
+        self._sync_score_deaths()
 
     def spell_context(self) -> SpellContext:
         """Read-only adapter for current targets, resources, and action ownership."""
@@ -480,8 +506,11 @@ class World:
     def execute_offensive_spell(self, action_id: str, spell_id: SpellId | str, *,
                                 status_check: StatusCheck | None = None) -> OffensiveSpellResult:
         """Low-level commit/effects; player input uses cast_selected_spell."""
-        return execute_offensive(action_id, spell_id, self, self.spells, self.combat,
-                                 status_check=status_check)
+        result = execute_offensive(action_id, spell_id, self, self.spells, self.combat,
+                                   status_check=status_check)
+        if result.valid:
+            self._sync_score_deaths()
+        return result
 
     def execute_support_spell(self, action_id: str, spell_id: SpellId | str, *,
                               status_check: StatusCheck | None = None) -> SupportSpellResult:
@@ -541,6 +570,7 @@ class World:
             return 0
         self.hp = 0 if forced else max(0, before - amount)
         lost = before - self.hp
+        self.score.record_damage(lost)
         kind = (StatusEventKind.FORCED_KNOCKOUT if forced else
                 StatusEventKind.POISON_DAMAGE if source == "poison" else
                 StatusEventKind.HAZARD_DAMAGE if source == "poison_tile" else StatusEventKind.DAMAGE)
@@ -585,9 +615,11 @@ class World:
             self._end_run(GameOverReason.HP_DEPLETED)
             return True
         self.bp = self.combat.finish_shot(self.bp)
+        self._sync_score_deaths()
         # Claim the action before invoking hooks, preventing repeated/reentrant phases.
         self._pending_action = None
         if self.check_stage_end():
+            self.score.finalize_stage(self.hp, self.max_hp, self.mp, self.max_mp)
             self._cleared_stage = self.stage
             self.transition_to(GameState.VICTORY if self.encounter.definition.final
                                else GameState.STAGE_CLEAR)
@@ -633,6 +665,7 @@ class World:
             state=self.state,
             instructions_page=self.instructions_page,
             combat_observations=self.combat.observations,
+            score=self.score.snapshot(),
             stage=self.stage,
             turn_index=self.turn_index,
             hp=self.hp,

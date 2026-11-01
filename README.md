@@ -288,8 +288,20 @@ spell shortcuts sit below it. No panel covers the battlefield or player lane.
 - **Feedback** preserves the latest selection or cast message until replaced by
   the model. It does not independently time out or generate combat events.
   Movement/aiming/selection remain free; one successful shot or spell uses the action.
-- **Score: —** reserves space for a future score display. Scoring and persistence
-  are not implemented; the dash is not an earned score of zero.
+- **Score** shows the current campaign score, including points earned in the
+  active stage attempt.
+
+Enemy defeats award 100 for a Basic Slime, 200 for other ordinary enemies, and
+1,000 for a boss. An explosion-chain kill adds 50. One completed volley that
+directly hits at least three distinct enemies adds 100; explosion splash and
+spell hits do not count toward that volley bonus. On a stage clear, full HP adds
+1,500, full MP adds 3,000, and taking no actual HP damage during the stage adds
+20,000. Healing does not restore the no-damage bonus; a Ward block does not
+count as damage.
+
+Retrying a failed stage discards points from that attempt and retains the scores
+of completed stages. Restarting the campaign resets the entire score. Scores
+exist only for the current run; no score or high-score file is saved.
 
 The HUD uses bundled Pygame fonts and procedural panels, so it works with an empty
 optional asset directory and needs no audio device. Sprite caching and procedural
@@ -325,8 +337,8 @@ advancement. Stage 2 and Stage 3 Game Over screens offer **T: Retry Current
 Stage** and **R: Restart Campaign**; Stage 1 offers the campaign restart.
 
 The third stage ends in Victory. Enter opens Results with the final stage, turn,
-and remaining resources. Its `Score: —` placeholder is unavailable data, not a
-numerical score; no kill totals, bonuses, records, or save files are fabricated.
+remaining resources, total score, and a breakdown of enemy defeats, Bomb chains,
+shot combos, and stage-clear bonuses. No records or save files are created.
 R from Stage Clear, Game Over, Victory, or Results returns to a fresh Stage 1
 Intro through the full campaign reset. T retries a later failed stage through
 its introduction, resetting HP, MP, BP, turn, cooldowns, statuses, hazards,
@@ -639,7 +651,7 @@ knockout without revival ends the run. The cycle repeats after EXECUTE.
 All 40 enemies, including Odin, are mandatory. The final authorized action must
 finish before Victory. Victory takes priority over another Odin attack, hazard,
 Poison, or Doom phase. Escaping never counts as defeat. Final HP, MP, BP, stage,
-and turn remain visible through Victory and Results. No score is calculated.
+and turn remain visible through Victory and Results along with the run score.
 
 ### Full-game victory smoke test
 

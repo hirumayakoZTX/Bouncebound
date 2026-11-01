@@ -252,15 +252,26 @@ class ScreenRenderer:
         self._paragraph(screen, message, (96, 166), width=768, color=TEXT, centered=True)
         self._panel(screen, (128, 228, 704, 188))
         self._text(screen, f'Stage {snapshot.stage} | Turn {snapshot.turn_index}', (160, 248),
-                   width=480, color=TEXT)
+                   width=450, color=TEXT)
         if state is GameState.RESULTS:
-            self._text(screen, 'Score: —', (650, 248), width=150, color=MUTED)
+            self._text(screen, f'Score: {snapshot.score.total}', (610, 248), width=190, color=TEXT)
         metrics = (('Health', f'HP {snapshot.hp}/{snapshot.max_hp}'),
                    ('Mana', f'MP {snapshot.mp}/{snapshot.max_mp}'), ('Next volley', f'BP {snapshot.bp}/{MAX_BP}'))
         for index, (label, value) in enumerate(metrics):
-            rect = self._panel(screen, (152 + index * 220, 296, 216, 92))
-            self._text(screen, label, (rect.x + 16, rect.y + 12), width=184, font='small', color=MUTED)
-            self._text(screen, value, (rect.x + 16, rect.y + 44), width=184, font='heading', color=color)
+            compact = state is GameState.RESULTS
+            rect = self._panel(screen, (152 + index * 220, 285 if compact else 296,
+                                       216, 54 if compact else 92))
+            self._text(screen, label, (rect.x + 16, rect.y + (4 if compact else 12)),
+                       width=184, font='small', color=MUTED)
+            self._text(screen, value, (rect.x + 16, rect.y + (25 if compact else 44)),
+                       width=184, font='body' if compact else 'heading', color=color)
+        if state is GameState.RESULTS:
+            breakdown = snapshot.score.breakdown
+            for text, pos in ((f'Enemy defeats: {breakdown.defeats}', (160, 350)),
+                              (f'Bomb chains: {breakdown.chains}', (490, 350)),
+                              (f'Shot combos: {breakdown.combos}', (160, 380)),
+                              (f'Stage bonuses: {breakdown.stage_bonuses}', (490, 380))):
+                self._text(screen, text, pos, width=300, font='small', color=TEXT)
         if state is GameState.STAGE_CLEAR and snapshot.next_stage_available:
             self._hint(screen, 'Enter: Next Stage', (256, 440, 448, 44))
             self._hint(screen, 'R: Restart Run', (256, 496, 448, 40))

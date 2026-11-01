@@ -23,6 +23,7 @@ from src.hud import (
 )
 from src.player_actions import SpellHUD, spell_failure_message
 from src.renderer import Renderer
+from src.scoring import ScoreBreakdown, ScoreSnapshot
 from src.spells import SpellFailure, SpellId, get_spell
 from src.states import GameState
 from src.statuses import StatusKind
@@ -124,10 +125,12 @@ class HUDTests(unittest.TestCase):
         self.assertIn('Waves: —', self.labels(replace(self.world.snapshot(), total_waves=0,
                                                    has_boss_wave=False)))
 
-    def test_score_is_an_unavailable_placeholder_without_model_field(self):
-        self.assertIn('Score: —', self.labels())
-        self.assertFalse(hasattr(self.world, 'score'))
-        self.assertFalse(hasattr(self.world.snapshot(), 'score'))
+    def test_score_displays_the_authoritative_snapshot_value(self):
+        self.assertIn('Score: 0', self.labels())
+        self.assertEqual(self.world.snapshot().score.total, 0)
+        snapshot = replace(self.world.snapshot(), score=ScoreSnapshot(ScoreBreakdown(defeats=123456)))
+        self.assertIn('Score: 123456', self.labels(snapshot))
+        self.assertEqual(self.hud._fit('Score: 123456', 'small', 114), 'Score: 123456')
 
     def test_no_selection_explains_free_selection_and_one_main_action(self):
         labels = self.labels()
