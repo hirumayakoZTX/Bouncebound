@@ -9,9 +9,8 @@ from stage_two_fixtures import enter_stage_two, STAGE_TWO_CLEAR
 
 ORDINARY_ROWS = (3,3,3,2,2,3,4,4,5,1,1,5,5,2,2,3,3,3)
 DEFENDED_CLEAR = tuple(('shot',row) for row in ORDINARY_ROWS) + (
-    ('ward',3),('reraise',3),('shot',3),
+    ('barrier',3), ('shot',3),
 )
-EXECUTE_CLEAR = DEFENDED_CLEAR
 
 
 def definition(*spawns, boss=None, capacity=25):
@@ -23,7 +22,7 @@ def definition(*spawns, boss=None, capacity=25):
     if boss:
         i,c,r=boss
         data['boss_wave']=dict(when='after_scripted_waves_cleared',escape_policy='contact_and_fail',
-                               spawns=[dict(id=i,kind='odin',col=c,row=r)])
+                               spawns=[dict(id=i,kind='iron_regent',col=c,row=r)])
     return parse_stage(data)
 
 

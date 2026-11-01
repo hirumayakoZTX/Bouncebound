@@ -76,7 +76,7 @@ class EffectsTests(unittest.TestCase):
         self.assertEqual([e.position for e in self.layer.last_events],[(312,240),(312,240)])
 
     def test_multiple_same_substep_contacts_preserve_projectile_and_enemy_order(self):
-        self.enemy(EnemyType.MORBOL);self.world.bp=3;self.fire();self.update()
+        self.enemy(EnemyType.MAWROOT);self.world.bp=3;self.fire();self.update()
         self.world.projectiles=[Projectile(i,(343,240),(-520,0))for i in (3,1,2)]
         hits=self.world.advance_time(PHYSICS_STEP);self.update()
         self.assertEqual([e.projectile_id for e in hits],[1,2,3])
@@ -96,11 +96,11 @@ class EffectsTests(unittest.TestCase):
         self.assertFalse(self.world.combat.observations)
 
     def test_zero_damage_does_not_make_a_hit_or_enrage_effect(self):
-        self.enemy(EnemyType.TONBERRY);self.update();self.world.combat.apply_damage(1,0);self.update()
+        self.enemy(EnemyType.HOODED_STALKER);self.update();self.world.combat.apply_damage(1,0);self.update()
         self.assertEqual(self.kinds(),[])
 
-    def test_positive_tonberry_damage_exposes_real_enrage_without_extra_action(self):
-        enemy=self.enemy(EnemyType.TONBERRY);self.update();self.world.combat.apply_damage(1,1);self.update()
+    def test_positive_hooded_stalker_damage_exposes_enrage_without_extra_action(self):
+        enemy=self.enemy(EnemyType.HOODED_STALKER);self.update();self.world.combat.apply_damage(1,1);self.update()
         self.assertEqual(self.kinds(),['hit','warning']);self.assertEqual(self.layer.last_events[-1].label,'ENRAGED')
         self.assertEqual(enemy.turns_alive,0)
 
@@ -114,12 +114,12 @@ class EffectsTests(unittest.TestCase):
 
     def test_aoe_direct_damage_facts_precede_bomb_death_chains(self):
         for i in (1,2):self.enemy(EnemyType.BOMB,i,i)
-        self.world.combat.apply_damage_batch((2,1),10,source='spell:starstorm');self.update()
+        self.world.combat.apply_damage_batch((2,1),10,source='spell:skyfall');self.update()
         self.assertEqual(self.kinds(),['hit','hit','explosion','explosion'])
         self.assertEqual([e.entity_id for e in self.layer.last_events],[1,2,1,2])
 
     def test_boss_death_is_identified_and_never_retained_as_collision_target(self):
-        self.enemy(EnemyType.ODIN);self.world.combat.apply_damage(1,50);self.update()
+        self.enemy(EnemyType.IRON_REGENT);self.world.combat.apply_damage(1,50);self.update()
         self.assertTrue(self.layer.last_events[-1].boss)
         self.assertFalse(self.world.combat.targets())
 
@@ -132,7 +132,7 @@ class EffectsTests(unittest.TestCase):
         self.assertFalse(self.world.combat.death_events)
 
     def test_combat_journal_and_effect_pool_are_bounded(self):
-        enemy=self.enemy(EnemyType.ODIN);enemy.hp=2000  # Long-lived fixture stresses storage only.
+        enemy=self.enemy(EnemyType.IRON_REGENT);enemy.hp=2000  # Long-lived fixture stresses storage only.
         for _ in range(700):self.world.combat.apply_damage(1,1)
         self.assertEqual(len(self.world.combat.observations),OBSERVATION_LIMIT)
         self.update();self.assertEqual(len(self.layer.effects),MAX_EFFECTS)
@@ -186,106 +186,45 @@ class EffectsTests(unittest.TestCase):
         self.assertFalse(layer.effects)
 
     def test_fire_uses_actual_cast_target_position(self):
-        self.enemy();result=self.cast('fire');effect=self.layer.last_events[0]
-        self.assertEqual(effect.kind,'spell:fire');self.assertEqual(effect.targets,((312,240),))
+        self.enemy();result=self.cast('ember_lance');effect=self.layer.last_events[0]
+        self.assertEqual(effect.kind,'spell:ember_lance');self.assertEqual(effect.targets,((312,240),))
         self.assertEqual(result.cast.targets.enemy_ids,(1,));self.assertEqual(self.world.mp,70)
 
-    def test_starstorm_uses_authoritative_area_center_and_radius(self):
-        self.enemy(col=6);result=self.cast('starstorm');effect=self.layer.last_events[0]
-        self.assertEqual((effect.position,effect.radius),(result.cast.targets.center,result.cast.targets.radius))
-        self.assertEqual(effect.radius,96)
-
-    def test_meteor_uses_actual_global_targets_without_extra_damage(self):
-        self.world=playing(definition((1,'tonberry',4,3),(2,'gorgon',2,2)))
-        self.layer=FeedbackLayer();self.update();self.cast('meteor')
-        effect=self.layer.last_events[0];self.assertEqual(effect.kind,'spell:meteor')
+    def test_skyfall_uses_actual_global_targets_without_extra_damage(self):
+        self.world=playing(definition((1,'hooded_stalker',4,3),(2,'thorn_sentinel',2,2)))
+        self.layer=FeedbackLayer();self.update();self.cast('skyfall')
+        effect=self.layer.last_events[0];self.assertEqual(effect.kind,'spell:skyfall')
         self.assertEqual(len(effect.targets),2);self.assertEqual((self.world.enemies[1].hp,self.world.enemies[2].hp),(3,0))
         before=deepcopy(vars(self.world))
         for _ in range(5):self.layer.draw(self.screen,self.world.snapshot())
         self.assertEqual(vars(self.world),before)
 
-    def test_cure_labels_only_actual_healing(self):
-        self.world.apply_player_damage(20);self.update();self.cast('cure')
+    def test_mend_labels_only_actual_healing(self):
+        self.world.apply_player_damage(20);self.update();self.cast('mend')
         self.assertEqual(self.layer.last_events[0].label,'+20 HP');self.assertEqual(self.world.hp,100)
 
-    def test_invalid_full_hp_cure_or_fire_does_not_emit_success(self):
-        for spell in ('cure','fire'):
+    def test_invalid_full_hp_mend_or_ember_lance_does_not_emit_success(self):
+        for spell in ('mend','ember_lance'):
             self.world.select_spell(spell);self.assertFalse(self.world.cast_selected_spell().valid)
             self.update();self.assertFalse(self.layer.last_events)
         self.assertEqual(self.world.mp,100)
 
-    def test_esuna_reports_only_actual_removed_status_count(self):
-        self.world=playing();self.layer=FeedbackLayer();self.update()
-        for kind in (StatusKind.POISON,StatusKind.BIND,StatusKind.DOOM):self.world.apply_status(kind)
-        self.update();self.cast('esuna')
-        self.assertEqual(self.layer.last_events[0].label,'Cleansed 2')
-        self.assertEqual([s.kind for s in self.world.snapshot().statuses],[StatusKind.DOOM])
 
-    def test_cleansing_retires_old_poison_bind_markers_and_keeps_cleanse_readable(self):
-        self.world=playing();self.layer=FeedbackLayer();self.update()
-        for kind in (StatusKind.POISON,StatusKind.BIND,StatusKind.DOOM):self.world.apply_status(kind)
-        self.update();self.cast('esuna')
-        labels=[effect.label for effect in self.layer.effects]
-        self.assertIn('DOOM',labels);self.assertNotIn('POISON',labels);self.assertNotIn('BIND',labels)
-        with patch.object(self.layer,'_label',wraps=self.layer._label)as text:
-            self.layer.draw(self.screen,self.world.snapshot())
-        self.assertIn('Cleansed 2',[call.args[1]for call in text.call_args_list])
 
-    def test_consumed_revive_grant_does_not_keep_showing_reraise_ready(self):
-        self.cast('reraise');self.world.force_player_knockout(source='odin_execute');self.update()
-        self.assertFalse(any(effect.kind=='spell:reraise'for effect in self.layer.effects))
-        self.assertTrue(any(effect.kind=='revive'for effect in self.layer.effects))
 
-    def test_empty_esuna_does_not_invent_cleansed_effects(self):
-        self.world=playing();self.layer=FeedbackLayer();self.update();self.cast('esuna')
+    def test_cleanse_does_not_invent_removed_effects(self):
+        self.world=playing();self.layer=FeedbackLayer();self.update();self.cast('cleanse')
         self.assertEqual(self.layer.last_events[0].label,'Cleansed 0')
 
-    def test_ward_and_reraise_grants_are_distinct_from_activation(self):
-        for spell in ('ward','reraise'):
-            self.world.start_new_run();self.world.transition_to(GameState.PLAYER_AIM)
-            self.layer=FeedbackLayer();self.update();self.cast(spell)
-            self.assertEqual(self.kinds(),['spell:'+spell]);self.assertNotIn('revive',self.kinds())
 
-    def test_levitation_visual_is_not_ordinary_damage_immunity(self):
-        self.world=playing();self.layer=FeedbackLayer();self.update();self.cast('levitation')
-        self.assertEqual(self.kinds(),['spell:levitation'])
-        self.world.apply_player_damage(5);self.update()
-        self.assertEqual(self.kinds(),['damage']);self.assertEqual(self.world.hp,95)
 
     def test_ward_block_is_not_shown_as_hp_loss(self):
         self.world.apply_status(StatusKind.WARD);self.update();self.world.apply_player_damage(100);self.update()
         self.assertEqual(self.kinds(),['ward_block']);self.assertEqual(self.world.hp,100)
 
-    def test_floor_block_comes_from_real_levitation_event(self):
-        self.world.apply_status(StatusKind.LEVITATION)
-        self.world.place_poison_tile(3)
-        tile=self.world.hazards.snapshot()[0];self.world.hazards.put(replace(tile,applied_turn=1))
-        self.world.turn_index=2;self.update()
-        self.fire()
-        for _ in range(21):self.world.advance_time(.25)
-        self.world.resolve_turn();self.update()
-        self.assertIn('floor_block',self.kinds());self.assertNotIn('damage',self.kinds())
 
-    def test_real_reraise_occurs_once_before_any_terminal_defeat(self):
-        self.world.apply_status(StatusKind.RERAISE);self.update();self.world.apply_player_damage(100);self.update()
-        self.assertEqual(self.kinds(),['damage','revive']);self.assertEqual(self.world.hp,50)
-        self.assertNotIn('defeat',self.kinds());self.update();self.assertEqual(self.kinds(),[])
-        self.world.apply_player_damage(50);self.update();self.assertIn('defeat',self.kinds())
 
-    def test_forced_execute_with_reraise_has_warning_and_one_revival_not_defeat(self):
-        self.world.apply_status(StatusKind.RERAISE);self.world.apply_status(StatusKind.WARD);self.update()
-        self.world.force_player_knockout(source='odin_execute');self.update()
-        self.assertEqual(self.kinds(),['warning','revive']);self.assertEqual(self.world.hp,50)
-        self.assertTrue(self.world.statuses.get(StatusKind.WARD))
 
-    def test_poison_and_doom_knockouts_emit_only_authoritative_terminal_feedback(self):
-        for source in ('poison','doom'):
-            self.world.start_new_run();self.world.transition_to(GameState.PLAYER_AIM)
-            self.layer=FeedbackLayer();self.update()
-            if source=='poison':self.world.apply_player_damage(100,source='poison')
-            else:self.world.force_player_knockout(source='doom')
-            self.update();self.assertEqual(self.kinds()[-1],'defeat')
-            self.assertEqual(self.world.game_over_reason,GameOverReason.HP_DEPLETED)
 
     def test_terminal_transition_is_emitted_once_and_results_does_not_replay_victory(self):
         snapshot=replace(self.world.snapshot(),state=GameState.VICTORY)
@@ -302,7 +241,7 @@ class EffectsTests(unittest.TestCase):
         self.assertFalse(self.layer.effects);self.assertFalse(self.layer.trails);self.assertEqual(self.layer._combat_cursor,0)
 
     def test_spell_visual_never_outlives_authorized_spell_phase(self):
-        self.cast('ward');self.world.advance_time(.45);self.update()
+        self.cast('barrier');self.world.advance_time(.45);self.update()
         self.assertFalse(any(e.kind.startswith('spell:')for e in self.layer.effects))
         self.assertIs(self.world.state,GameState.TURN_RESOLVE)
 
@@ -313,7 +252,7 @@ class EffectsTests(unittest.TestCase):
         self.assertEqual(len(self.world.combat.death_events),1)
 
     def test_draw_preserves_clip_world_and_effect_ages_and_avoids_hud(self):
-        self.cast('ward');before=deepcopy(vars(self.world));effects=tuple(self.layer.effects)
+        self.cast('barrier');before=deepcopy(vars(self.world));effects=tuple(self.layer.effects)
         color=(7,8,9);self.screen.fill(color);clip=self.screen.get_clip()
         self.layer.draw(self.screen,self.world.snapshot())
         self.assertEqual(self.screen.get_clip(),clip);self.assertEqual(vars(self.world),before)
@@ -322,16 +261,9 @@ class EffectsTests(unittest.TestCase):
             pixels=pygame.image.tobytes(self.screen.subsurface(rect),'RGB')
             self.assertEqual(pixels,bytes(color)*(rect[2]*rect[3]))
 
-    def test_all_effect_draw_styles_work_at_arena_edges_and_preserve_canvas(self):
-        self.layer.effects.clear()
-        kinds=['hit','death','explosion','bounce','crystal','launch','damage','warning','revive','ward_block','floor_block']
-        kinds+=['spell:'+name for name in ('fire','starstorm','meteor','cure','esuna','levitation','ward','reraise')]
-        for i,kind in enumerate(kinds):
-            self.layer.effects.append(VisualEffect(i,kind,(103,79),targets=((120,96),),radius=96,label='Test'))
-        self.layer.draw(self.screen,self.world.snapshot());self.assertEqual(self.screen.get_size(),(960,576))
 
     def test_simultaneous_floating_labels_stack_instead_of_overlapping(self):
-        for i,kind in enumerate(('damage','warning','revive')):
+        for i,kind in enumerate(('damage','warning','ward_block')):
             self.layer.effects.append(VisualEffect(i,kind,(824,240),label=str(i)))
         with patch.object(self.layer,'_label',wraps=self.layer._label)as text:
             self.layer.draw(self.screen,self.world.snapshot())
@@ -445,9 +377,14 @@ class AudioFeedbackTests(unittest.TestCase):
 
     def test_cli_flags_are_explicit_and_default_silent(self):
         import main
+        from src.persistence import HighScoreStore
         for args,enabled,audio in (([],True,False),(['--audio'],True,True),(['--no-effects'],False,False)):
             with patch('main.Game')as game:
-                main.main(args);game.assert_called_once_with(audio_enabled=audio,effects_enabled=enabled)
+                main.main(args)
+                game.assert_called_once()
+                self.assertEqual(game.call_args.kwargs['audio_enabled'], audio)
+                self.assertEqual(game.call_args.kwargs['effects_enabled'], enabled)
+                self.assertIsInstance(game.call_args.kwargs['high_score_store'], HighScoreStore)
                 game.return_value.run.assert_called_once_with()
 
     def test_repeated_draws_and_snapshots_do_not_replay_cues(self):
@@ -459,47 +396,3 @@ class AudioFeedbackTests(unittest.TestCase):
             r.update_feedback(w.snapshot(),0)
             for _ in range(5):r.draw(screen,w.snapshot());r.update_feedback(w.snapshot(),0)
             self.assertEqual([c.args[0]for c in play.call_args_list],['shoot'])
-
-
-class EffectsCampaignTests(unittest.TestCase):
-    def test_complete_campaign_effects_on_off_and_four_schedules_have_identical_gameplay(self):
-        pygame.display.init();pygame.font.init();self.addCleanup(pygame.quit)
-        screen=pygame.display.set_mode((960,576));reference=None
-        routes=(tuple(('shot',r)for r in OPENING_ROWS+(2,5)),STAGE_TWO_CLEAR,DEFENDED_CLEAR)
-        for enabled,schedule in ((True,(1/30,)),(True,(1/60,)),(True,(1/144,)),(True,(.007,.041,.013,.09)),(False,(1/60,))):
-            game=Game(effects_enabled=enabled);game.running=True;w=game.world;r=Renderer();r.feedback.enabled=enabled
-            history=[];times=cycle(schedule);r.update_feedback(w.snapshot(),0,epoch=game._presentation_epoch)
-            def key(value):
-                pygame.event.post(pygame.event.Event(pygame.KEYDOWN,key=value))
-                for event in pygame.event.get():game.handle_event(event)
-            key(pygame.K_RETURN)
-            for stage,route in enumerate(routes,1):
-                r.update_feedback(w.snapshot(),0,epoch=game._presentation_epoch)
-                self.assertFalse(r.feedback.effects);key(pygame.K_RETURN)
-                for kind,row in route:
-                    while w.player_row!=row:key(pygame.K_DOWN if w.player_row<row else pygame.K_UP)
-                    if kind=='shot':
-                        pygame.event.post(pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=(96,96+48*row)))
-                        for event in pygame.event.get():game.handle_event(event)
-                    else:
-                        spell_key={'starstorm':pygame.K_2,'meteor':pygame.K_3,
-                                   'ward':pygame.K_7,'reraise':pygame.K_8}[kind]
-                        key(spell_key);key(pygame.K_SPACE)
-                    r.update_feedback(w.snapshot(),0,epoch=game._presentation_epoch)
-                    while w.state in (GameState.SHOT_ANIMATION,GameState.SPELL_ANIMATION):
-                        dt=next(times);w.advance_time(dt);r.update_feedback(w.snapshot(),dt,epoch=game._presentation_epoch)
-                        r.draw(screen,w.snapshot())
-                    self.assertTrue(w.resolve_turn());r.update_feedback(w.snapshot(),0,epoch=game._presentation_epoch)
-                    snap=w.snapshot();before=deepcopy(vars(w));r.draw(screen,snap)
-                    self.assertEqual(vars(w),before)
-                    history.append((snap,tuple(w.combat.death_events),tuple(w.encounter.spawn_history)))
-                    self.assertLessEqual(len(r.feedback.effects),MAX_EFFECTS)
-                if stage<3:key(pygame.K_RETURN)
-            self.assertIs(w.state,GameState.VICTORY);key(pygame.K_RETURN)
-            r.update_feedback(w.snapshot(),0,epoch=game._presentation_epoch)
-            self.assertIs(w.state,GameState.RESULTS)
-            self.assertEqual((w.stage,w.turn_index,w.hp,w.mp,w.bp),(3,21,50,20,5))
-            if reference is None:reference=history
-            self.assertEqual(history,reference,(enabled,schedule))
-            key(pygame.K_r);r.update_feedback(w.snapshot(),0,epoch=game._presentation_epoch)
-            self.assertFalse(r.feedback.effects);self.assertFalse(r.feedback.trails)

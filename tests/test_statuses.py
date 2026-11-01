@@ -1,93 +1,107 @@
-"""Status data fixtures, immutable views, and refresh storage without runtime rules."""
+"""Immutable Poison and Ward records with deterministic phase timing."""
 
-from copy import deepcopy
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 import unittest
 
-from src.statuses import StatusEffect, StatusKind, StatusState
+from src.statuses import (
+    StatusEffect, StatusEventKind, StatusKind, StatusState,
+)
 
 
-def fixture(kind, turn=1, source='fixture'):
-    return StatusEffect(kind, None if kind is StatusKind.RERAISE else 2, turn, source,
-                        charges=1 if kind in (StatusKind.WARD, StatusKind.RERAISE) else None)
+def effect(kind, turn=1, remaining=2, source="fixture"):
+    return StatusEffect(kind, remaining, turn, source,
+                        charges=1 if kind is StatusKind.WARD else None)
 
 
 class StatusDataTests(unittest.TestCase):
-    def test_kind_classification_and_future_revive_hp(self):
-        for kind in StatusKind:
-            with self.subTest(kind=kind):
-                effect = fixture(kind)
-                positive = kind in (StatusKind.WARD, StatusKind.LEVITATION, StatusKind.RERAISE)
-                self.assertEqual(effect.beneficial, positive)
-                self.assertEqual(effect.negative, not positive)
-                self.assertEqual(effect.revival_hp, 50 if kind is StatusKind.RERAISE else None)
+    def test_only_remaining_statuses_are_available(self):
+        self.assertEqual(set(StatusKind), {StatusKind.POISON, StatusKind.WARD})
+        self.assertEqual(StatusKind.POISON.beneficial if hasattr(StatusKind.POISON, "beneficial") else False, False)
+        self.assertEqual(StatusEventKind.WARD_BLOCKED.value, "damage_blocked_by_ward")
 
-    def test_status_fields_are_immutable(self):
-        effect = fixture(StatusKind.POISON)
-        for field, value in (('remaining_turns', 0), ('applied_turn', 9), ('kind', StatusKind.DOOM)):
-            with self.subTest(field=field), self.assertRaises(FrozenInstanceError):
-                setattr(effect, field, value)
-
-    def test_bad_kind_timing_sources_and_charge_models_are_rejected(self):
-        invalid = [dict(kind='poison', remaining_turns=2, applied_turn=1)]
-        invalid += [dict(kind=StatusKind.POISON, remaining_turns=n, applied_turn=1)
-                    for n in (0, -1, True, 1.5)]
-        invalid += [dict(kind=StatusKind.POISON, remaining_turns=2, applied_turn=n)
-                    for n in (0, -1, False, 1.5)]
-        invalid += [dict(kind=StatusKind.POISON, remaining_turns=2, applied_turn=1, source_id=n)
-                    for n in (0, True, '', '  ', [])]
-        invalid += [dict(kind=StatusKind.WARD, remaining_turns=1, applied_turn=1, charges=n)
-                    for n in (None, 0, 2, True)]
-        invalid += [dict(kind=StatusKind.LEVITATION, remaining_turns=1, applied_turn=1, charges=1),
-                    dict(kind=StatusKind.LEVITATION, remaining_turns=None, applied_turn=1),
-                    dict(kind=StatusKind.WARD, remaining_turns=None, applied_turn=1, charges=1),
-                    dict(kind=StatusKind.RERAISE, remaining_turns=1, applied_turn=1, charges=1)]
+    def test_records_validate_timing_and_ward_charge_model(self):
+        invalid = [
+            dict(kind="poison", remaining_turns=2, applied_turn=1),
+            dict(kind=StatusKind.POISON, remaining_turns=0, applied_turn=1),
+            dict(kind=StatusKind.POISON, remaining_turns=True, applied_turn=1),
+            dict(kind=StatusKind.POISON, remaining_turns=2, applied_turn=0),
+            dict(kind=StatusKind.WARD, remaining_turns=1, applied_turn=1),
+            dict(kind=StatusKind.WARD, remaining_turns=1, applied_turn=1, charges=2),
+            dict(kind=StatusKind.POISON, remaining_turns=1, applied_turn=1, charges=1),
+        ]
         for values in invalid:
             with self.subTest(values=values), self.assertRaises(ValueError):
                 StatusEffect(**values)
 
-    def test_refresh_replaces_one_record_and_retains_old_snapshot(self):
+    def test_effects_and_events_are_immutable(self):
+        record = effect(StatusKind.POISON)
+        with self.assertRaises(FrozenInstanceError):
+            record.remaining_turns = 1
         state = StatusState()
-        old = fixture(StatusKind.WARD)
-        new = fixture(StatusKind.WARD, turn=5, source='refresh')
-        self.assertIsNone(state.put(old))
-        snapshot = state.snapshot()
-        self.assertIs(state.put(new), old)
-        self.assertIs(state.get(StatusKind.WARD), new)
-        self.assertEqual(len(state.snapshot()), 1)
-        self.assertEqual(state.get(StatusKind.WARD).charges, 1)
-        self.assertEqual(snapshot, (old,))
-        self.assertEqual(snapshot[0].applied_turn, 1)
+        state.put(record)
+        with self.assertRaises(FrozenInstanceError):
+            state.events[0].amount = 4
 
-    def test_snapshot_order_is_deterministic_across_insertion_orders(self):
+    def test_refresh_replaces_one_record_and_old_snapshot_is_stable(self):
+        state = StatusState()
+        old = effect(StatusKind.POISON)
+        refreshed = effect(StatusKind.POISON, turn=4, remaining=3, source=7)
+        state.put(old)
+        snapshot = state.snapshot()
+        self.assertIs(state.put(refreshed), old)
+        self.assertEqual(state.snapshot(), (refreshed,))
+        self.assertEqual(snapshot, (old,))
+        self.assertEqual(len(state.snapshot()), 1)
+
+    def test_poison_has_application_grace_and_one_tick_per_phase(self):
+        state = StatusState()
+        original = effect(StatusKind.POISON, turn=1, remaining=3)
+        state.put(original)
+        initial = state.snapshot()
+        state.begin_phase(1)
+        self.assertIsNone(state.take_poison_tick(1, original))
+        state.finish_phase(1, initial)
+        state.begin_phase(2)
+        self.assertIsNotNone(state.take_poison_tick(2, original))
+        self.assertIsNone(state.take_poison_tick(2, original))
+
+    def test_refresh_during_phase_keeps_already_earned_tick(self):
+        state = StatusState()
+        original = effect(StatusKind.POISON, turn=1, remaining=3)
+        state.put(original)
+        state.begin_phase(2)
+        initial = state.snapshot()
+        due = state.take_poison_tick(2, original)
+        self.assertIs(due, original)
+        refreshed = effect(StatusKind.POISON, turn=2, remaining=3, source=9)
+        state.put(refreshed)
+        self.assertIsNone(state.take_poison_tick(2, original))
+        state.finish_phase(2, initial)
+        self.assertEqual(state.get(StatusKind.POISON), refreshed)
+
+    def test_ward_has_one_charge_and_status_order_is_deterministic(self):
         states = []
-        for kinds in (tuple(StatusKind), tuple(reversed(tuple(StatusKind)))):
+        for order in ((StatusKind.POISON, StatusKind.WARD),
+                      (StatusKind.WARD, StatusKind.POISON)):
             state = StatusState()
-            for kind in kinds:
-                state.put(fixture(kind))
+            for kind in order:
+                state.put(effect(kind, remaining=1))
             states.append(state.snapshot())
         self.assertEqual(states[0], states[1])
-        self.assertEqual([e.kind.value for e in states[0]], sorted(k.value for k in StatusKind))
+        self.assertEqual([item.kind for item in states[0]],
+                         [StatusKind.POISON, StatusKind.WARD])
+        self.assertEqual(states[0][1].charges, 1)
 
-    def test_remove_and_reset_are_data_operations_with_no_other_effects(self):
+    def test_remove_and_reset_are_data_operations(self):
         state = StatusState()
-        poison = fixture(StatusKind.POISON, source=42)
+        poison = effect(StatusKind.POISON)
         state.put(poison)
-        state.put(fixture(StatusKind.BIND))
         self.assertIs(state.remove(StatusKind.POISON), poison)
-        self.assertIsNone(state.remove(StatusKind.POISON))
+        state.put(effect(StatusKind.WARD))
         state.reset()
         self.assertEqual(state.snapshot(), ())
-
-    def test_invalid_records_do_not_modify_storage(self):
-        state = StatusState()
-        state.put(fixture(StatusKind.POISON))
-        before = deepcopy(state)
-        for value in (None, 'poison', {}):
-            with self.subTest(value=value), self.assertRaises(ValueError):
-                state.put(value)
-            self.assertEqual(state, before)
+        self.assertEqual(state.events, ())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -14,19 +14,19 @@
         },
         {
           "id": 202,
-          "kind": "cactuar",
+          "kind": "needleling",
           "col": 6,
           "row": 3
         },
         {
           "id": 203,
-          "kind": "landtrap",
+          "kind": "snaproot",
           "col": 6,
           "row": 2
         },
         {
           "id": 204,
-          "kind": "alligator",
+          "kind": "marshmaw",
           "col": 5,
           "row": 3
         },
@@ -49,19 +49,19 @@
         },
         {
           "id": 207,
-          "kind": "bulb",
+          "kind": "sporebud",
           "col": 6,
           "row": 2
         },
         {
           "id": 208,
-          "kind": "morbol",
+          "kind": "mawroot",
           "col": 6,
           "row": 1
         },
         {
           "id": 209,
-          "kind": "landtrap",
+          "kind": "snaproot",
           "col": 5,
           "row": 2
         },
@@ -84,25 +84,25 @@
         },
         {
           "id": 212,
-          "kind": "cactuar",
+          "kind": "needleling",
           "col": 6,
           "row": 4
         },
         {
           "id": 213,
-          "kind": "alligator",
+          "kind": "marshmaw",
           "col": 6,
           "row": 3
         },
         {
           "id": 214,
-          "kind": "bulb",
+          "kind": "sporebud",
           "col": 5,
           "row": 4
         },
         {
           "id": 215,
-          "kind": "landtrap",
+          "kind": "snaproot",
           "col": 5,
           "row": 5
         },
@@ -125,25 +125,25 @@
         },
         {
           "id": 218,
-          "kind": "morbol",
+          "kind": "mawroot",
           "col": 6,
           "row": 1
         },
         {
           "id": 219,
-          "kind": "alligator",
+          "kind": "marshmaw",
           "col": 6,
           "row": 0
         },
         {
           "id": 220,
-          "kind": "bulb",
+          "kind": "sporebud",
           "col": 5,
           "row": 1
         },
         {
           "id": 221,
-          "kind": "cactuar",
+          "kind": "needleling",
           "col": 5,
           "row": 2
         },
@@ -166,25 +166,25 @@
         },
         {
           "id": 224,
-          "kind": "morbol",
+          "kind": "mawroot",
           "col": 6,
           "row": 5
         },
         {
           "id": 225,
-          "kind": "landtrap",
+          "kind": "snaproot",
           "col": 6,
           "row": 4
         },
         {
           "id": 226,
-          "kind": "cactuar",
+          "kind": "needleling",
           "col": 5,
           "row": 5
         },
         {
           "id": 227,
-          "kind": "alligator",
+          "kind": "marshmaw",
           "col": 5,
           "row": 6
         },
@@ -207,31 +207,31 @@
         },
         {
           "id": 230,
-          "kind": "morbol",
+          "kind": "mawroot",
           "col": 6,
           "row": 3
         },
         {
           "id": 231,
-          "kind": "bulb",
+          "kind": "sporebud",
           "col": 6,
           "row": 2
         },
         {
           "id": 232,
-          "kind": "alligator",
+          "kind": "marshmaw",
           "col": 5,
           "row": 3
         },
         {
           "id": 233,
-          "kind": "landtrap",
+          "kind": "snaproot",
           "col": 5,
           "row": 4
         },
         {
           "id": 234,
-          "kind": "cactuar",
+          "kind": "needleling",
           "col": 4,
           "row": 3
         },
@@ -249,7 +249,7 @@
     "spawns": [
       {
         "id": 300,
-        "kind": "chichu",
+        "kind": "briarheart",
         "col": 7,
         "row": 3
       }

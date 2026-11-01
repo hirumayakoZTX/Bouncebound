@@ -18,9 +18,9 @@ STAGE_TWO_ROWS = (3, 3, 2, 2, 4, 3, 1, 1, 5, 5, 3, 3, 3)
 STAGE_THREE_ROWS = (3, 3, 3, 2, 2, 3, 4, 4, 5, 1, 1, 5, 5, 2, 2, 3, 3, 3)
 
 
-def run_defended_campaign(schedule):
-    """Play all stages using shots, then Ward/Reraise for Odin's last cycle."""
-    world = World()
+def run_defended_campaign(schedule, *, high_score_store=None):
+    """Play each stage with ordinary volleys and survive Iron Knight without revival."""
+    world = World(high_score_store=high_score_store)
     world.start_new_run()
     world.transition_to(GameState.PLAYER_AIM)
 
@@ -44,9 +44,8 @@ def run_defended_campaign(schedule):
         perform_action(world, "shot", row, schedule)
     if world.state is not GameState.PLAYER_AIM or world.turn_index != 19:
         return world, False
-    perform_action(world, "ward", 3, schedule)
-    perform_action(world, "reraise", 3, schedule)
-    perform_action(world, "shot", 3, schedule)
+    for kind in ("barrier", "shot"):
+        perform_action(world, kind, 3, schedule)
     if world.state is GameState.VICTORY:
         world.transition_to(GameState.RESULTS)
     return world, world.state is GameState.RESULTS
@@ -56,9 +55,8 @@ class DamageBalanceTests(unittest.TestCase):
     def test_candidate_b_values_are_authoritative_and_other_stats_are_unchanged(self):
         self.assertEqual((ENEMY_STATS[EnemyType.BOMB][0], ORB_DAMAGE, 10), (10, 4, 10))
         self.assertEqual(ENEMY_STATS[EnemyType.BASIC], (5, 0))
-        self.assertEqual(OFFENSIVE_DAMAGE[SpellId.FIRE], 20)
-        self.assertEqual(OFFENSIVE_DAMAGE[SpellId.STARSTORM], 10)
-        self.assertEqual(OFFENSIVE_DAMAGE[SpellId.METEOR], 15)
+        self.assertEqual(OFFENSIVE_DAMAGE[SpellId.EMBER_LANCE], 20)
+        self.assertEqual(OFFENSIVE_DAMAGE[SpellId.SKYFALL], 15)
 
     def test_three_valid_four_damage_hits_are_needed_to_destroy_a_full_bomb(self):
         bomb = Enemy(1, EnemyType.BOMB, 4, 3)
@@ -155,7 +153,7 @@ class DamageBalanceTests(unittest.TestCase):
                 self.assertTrue(completed, (world.stage, world.turn_index, world.hp,
                                             world.mp, world.bp, world.state))
                 self.assertEqual((world.stage, world.turn_index, world.hp, world.mp, world.bp),
-                                 (3, 21, 50, 20, 5))
+                                 (3, 20, 27, 70, 5))
                 self.assertEqual(len(world.combat.death_events), 40)
                 results.append((world.stage, world.turn_index, world.hp, world.mp, world.bp,
                                 tuple(world.encounter.spawn_history),

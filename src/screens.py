@@ -37,19 +37,19 @@ INSTRUCTION_CARDS = (
             'Rewards settle after the volley ends.', 'Shooting does not consume BP.',
         )),
         ('Spells and unlocks', (
-            '1-8: select an unlocked spell.', 'Space: cast; MP and cooldowns apply.',
-            'S1: Fire, Starstorm, Cure, Ward, Reraise.', 'S2 adds Esuna and Levitation.',
+            '1-5: select an unlocked spell.', 'Space: cast; MP and cooldowns apply.',
+            'S1: Fire, Cure, Ward.', 'S2 adds Cleanse.',
             'S3 adds Meteor.',
         )),
     ),
     (
         ('Harmful statuses', (
-            'Poison: 3 HP each eligible enemy phase.', 'Bind: vertical movement is blocked.',
-            'Doom: countdown to forced knockout.', 'Esuna removes Poison/Bind, not Doom.',
+            'Poison: 3 HP each eligible enemy phase.', 'Poison may drain HP over time.',
+            'Cleanse removes Poison.', 'A lethal hit ends the run.',
         )),
-        ('Protection and revival', (
-            'Ward: block one ordinary damage event.', 'Levitation: ignore floor effects.',
-            'Reraise: next knockout restores 50 HP.', 'Reraise can be cast once per encounter.',
+        ('Protection and recovery', (
+            'Ward: block one ordinary damage event.', 'Cure: restore up to 50 HP.',
+            'Poison refreshes its current duration.', 'Iron Knight uses two slashes and a heavy blow.',
         )),
         ('Stages and completion', (
             'Defeat required enemies and bosses.', 'Enter after Stage Clear: next stage.',
@@ -65,11 +65,11 @@ INSTRUCTION_CARDS = (
 
 STAGE_COPY = {
     1: ('Learn the ricochet', 'Bounce through enemy lines and link Bomb explosions. '
-        'Gather blue crystals to build stronger volleys.', 'Ultros and Typhon'),
-    2: ('Read the battlefield', 'New enemy abilities bring Poison, Bind and dangerous floor tiles. '
-        'Cleanse harmful effects or protect your next action.', 'Chichu'),
-    3: ('Hold the final line', 'Face Doom, enraged enemies and the final confrontation. '
-        'Choose your shots and defenses with care.', 'Odin'),
+        'Gather blue crystals to build stronger volleys.', 'Octopus and Hurricane'),
+    2: ('Read the battlefield', 'New enemy abilities bring Poison and dangerous attacks. '
+        'Cleanse harmful effects or protect your next action.', 'Seedling'),
+    3: ('Hold the final line', 'Face Poison, enraged enemies and the final confrontation. '
+        'Choose your shots and defenses with care.', 'Iron Knight'),
 }
 
 
@@ -214,7 +214,7 @@ class ScreenRenderer:
                         (right.x + 20, right.y + 62), width=264, color=TEXT)
         self._text(screen, 'Unlocked spells', (right.x + 20, right.y + 114), width=264,
                    font='small', color=MUTED)
-        names = ', '.join(spell.name.removeprefix('Pom ') for spell in SPELLS.values()
+        names = ', '.join(spell.name for spell in SPELLS.values()
                           if spell.unlock_stage <= snapshot.stage)
         self._paragraph(screen, names, (right.x + 20, right.y + 142), width=264,
                         font='small', color=TEXT)
@@ -232,7 +232,7 @@ class ScreenRenderer:
         self._text(screen, phase.get(snapshot.paused_state, 'Gameplay is paused.'),
                    (rect.x + 24, rect.y + 86), width=464, color=MUTED, centered=True)
         for line, y in (('W/S: Move | Mouse: Aim | Click: Shoot', 266),
-                        ('1-8: Select spell | Space: Cast', 294)):
+                        ('1-5: Select spell | Space: Cast', 294)):
             self._text(screen, line, (rect.x + 24, y), width=464, font='small', centered=True)
         self._hint(screen, 'Escape: Resume', (288, 346, 384, 44))
 
@@ -244,23 +244,50 @@ class ScreenRenderer:
                        else 'Prototype encounter complete')
         elif state is GameState.GAME_OVER:
             title, eyebrow, color = 'Game Over', 'THE DEFENSE HAS ENDED', HARMFUL
-            message = snapshot.game_over_reason.value if snapshot.game_over_reason else 'Run ended'
+            message = (snapshot.game_over_reason.value if snapshot.game_over_reason
+                       else 'Run ended')
         else:
             title = 'Victory' if state is GameState.VICTORY else 'Results'
             eyebrow, color, message = 'THREE-STAGE CAMPAIGN COMPLETE', ACCENT, 'Campaign complete'
         self._header(screen, title, eyebrow, color=color)
         self._paragraph(screen, message, (96, 166), width=768, color=TEXT, centered=True)
+        if state is GameState.GAME_OVER and snapshot.death_cause:
+            self._paragraph(screen, snapshot.death_cause, (96, 196), width=768,
+                            font='small', color=HARMFUL, centered=True)
         self._panel(screen, (128, 228, 704, 188))
         self._text(screen, f'Stage {snapshot.stage} | Turn {snapshot.turn_index}', (160, 248),
-                   width=480, color=TEXT)
+                   width=450, color=TEXT)
         if state is GameState.RESULTS:
-            self._text(screen, 'Score: —', (650, 248), width=150, color=MUTED)
+            self._text(screen, f'Score: {snapshot.score.total}', (610, 248), width=190, color=TEXT)
+            stored = snapshot.high_scores
+            best_text = (f'Best: {stored.record.best_score}'
+                         if stored.available and stored.record is not None
+                         else 'Best: unavailable')
+            self._text(screen, best_text, (610, 270), width=190,
+                       font='small', color=ACCENT)
+            save_text = ('NEW RECORD SAVED' if stored.new_record is True else
+                         'Score saved' if stored.saved is True else
+                         'Score not saved' if stored.saved is False else '')
+            if save_text:
+                self._text(screen, save_text, (610, 292), width=190,
+                           font='small', color=BENEFICIAL if stored.saved else HARMFUL)
         metrics = (('Health', f'HP {snapshot.hp}/{snapshot.max_hp}'),
                    ('Mana', f'MP {snapshot.mp}/{snapshot.max_mp}'), ('Next volley', f'BP {snapshot.bp}/{MAX_BP}'))
         for index, (label, value) in enumerate(metrics):
-            rect = self._panel(screen, (152 + index * 220, 296, 216, 92))
-            self._text(screen, label, (rect.x + 16, rect.y + 12), width=184, font='small', color=MUTED)
-            self._text(screen, value, (rect.x + 16, rect.y + 44), width=184, font='heading', color=color)
+            compact = state is GameState.RESULTS
+            rect = self._panel(screen, (152 + index * 220, 316 if compact else 296,
+                                       216, 50 if compact else 92))
+            self._text(screen, label, (rect.x + 16, rect.y + (4 if compact else 12)),
+                       width=184, font='small', color=MUTED)
+            self._text(screen, value, (rect.x + 16, rect.y + (25 if compact else 44)),
+                       width=184, font='body' if compact else 'heading', color=color)
+        if state is GameState.RESULTS:
+            breakdown = snapshot.score.breakdown
+            for text, pos in ((f'Enemy defeats: {breakdown.defeats}', (160, 370)),
+                              (f'Bomb chains: {breakdown.chains}', (490, 370)),
+                              (f'Shot combos: {breakdown.combos}', (160, 393)),
+                              (f'Stage bonuses: {breakdown.stage_bonuses}', (490, 393))):
+                self._text(screen, text, pos, width=300, font='small', color=TEXT)
         if state is GameState.STAGE_CLEAR and snapshot.next_stage_available:
             self._hint(screen, 'Enter: Next Stage', (256, 440, 448, 44))
             self._hint(screen, 'R: Restart Run', (256, 496, 448, 40))

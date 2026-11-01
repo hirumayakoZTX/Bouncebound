@@ -9,7 +9,7 @@ from src.entities import Crystal, Enemy, EnemyType, ENEMY_UNLOCK_STAGE, LIVE_BOS
 from src.constants import GRID_COLUMNS, GRID_ROWS
 
 
-BOSS_STAGES = MappingProxyType({"ultros": 1, "typhon": 1, "chichu": 2, "odin": 3})
+BOSS_STAGES = MappingProxyType({"inkmaw": 1, "galejaw": 1, "briarheart": 2, "iron_regent": 3})
 
 
 @dataclass(frozen=True)
@@ -56,7 +56,7 @@ class BossSpawn:
     def __post_init__(self) -> None:
         validate_id(self.entity_id)
         if type(self.kind) is not str or self.kind not in BOSS_STAGES:
-            raise ValueError("Boss kind must be ultros, typhon, chichu, or odin")
+            raise ValueError("Boss kind must be inkmaw, galejaw, briarheart, or iron_regent")
         cell_bounds(self.col, self.row)
 
 

@@ -7,16 +7,18 @@ from src.renderer import Renderer
 from src.states import ACTIVE_STATES, GameState
 from src.world import World
 from src.spells import SpellId
+from src.persistence import HighScoreStore
 
 
 SPELL_KEYS = dict(zip((pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4,
-                       pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8), SpellId))
+                       pygame.K_5), SpellId))
 
 
 class Game:
-    def __init__(self, *, effects_enabled: bool = True, audio_enabled: bool = False) -> None:
+    def __init__(self, *, effects_enabled: bool = True, audio_enabled: bool = False,
+                 high_score_store: HighScoreStore | None = None) -> None:
         self.running = False
-        self.world = World()
+        self.world = World(high_score_store=high_score_store)
         self.effects_enabled = effects_enabled
         self.audio_enabled = audio_enabled
         self._presentation_epoch = 0

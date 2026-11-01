@@ -6,26 +6,21 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Protocol
 
-from src.constants import BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE, TILE_SIZE
 from src.entities import EnemySnapshot
 from src.states import GameState
 from src.statuses import StatusEffect
 
 
 class SpellId(Enum):
-    FIRE = "fire"
-    STARSTORM = "starstorm"
-    METEOR = "meteor"
-    CURE = "cure"
-    ESUNA = "esuna"
-    LEVITATION = "levitation"
-    WARD = "ward"
-    RERAISE = "reraise"
+    EMBER_LANCE = "ember_lance"
+    MEND = "mend"
+    BARRIER = "barrier"
+    CLEANSE = "cleanse"
+    SKYFALL = "skyfall"
 
 
 class TargetKind(Enum):
     NEAREST_IN_ROW = "nearest_in_row"
-    FRONT_AREA = "front_area"
     ALL_ENEMIES = "all_enemies"
     SELF = "self"
 
@@ -41,14 +36,11 @@ class SpellDefinition:
 
 
 SPELLS: Mapping[SpellId, SpellDefinition] = MappingProxyType({
-    SpellId.FIRE: SpellDefinition(SpellId.FIRE, "Pom Fire", 30, 3, 1, TargetKind.NEAREST_IN_ROW),
-    SpellId.STARSTORM: SpellDefinition(SpellId.STARSTORM, "Pom Starstorm", 40, 4, 1, TargetKind.FRONT_AREA),
-    SpellId.METEOR: SpellDefinition(SpellId.METEOR, "Pom Meteor", 80, 10, 3, TargetKind.ALL_ENEMIES),
-    SpellId.CURE: SpellDefinition(SpellId.CURE, "Pom Cure", 10, 1, 1, TargetKind.SELF),
-    SpellId.ESUNA: SpellDefinition(SpellId.ESUNA, "Pom Esuna", 20, 3, 2, TargetKind.SELF),
-    SpellId.LEVITATION: SpellDefinition(SpellId.LEVITATION, "Pom Levitation", 20, 3, 2, TargetKind.SELF),
-    SpellId.WARD: SpellDefinition(SpellId.WARD, "Pom Ward", 30, 3, 1, TargetKind.SELF),
-    SpellId.RERAISE: SpellDefinition(SpellId.RERAISE, "Pom Reraise", 50, 99, 1, TargetKind.SELF),
+    SpellId.EMBER_LANCE: SpellDefinition(SpellId.EMBER_LANCE, "Fire", 30, 3, 1, TargetKind.NEAREST_IN_ROW),
+    SpellId.MEND: SpellDefinition(SpellId.MEND, "Cure", 10, 1, 1, TargetKind.SELF),
+    SpellId.BARRIER: SpellDefinition(SpellId.BARRIER, "Ward", 30, 3, 1, TargetKind.SELF),
+    SpellId.CLEANSE: SpellDefinition(SpellId.CLEANSE, "Cleanse", 20, 3, 2, TargetKind.SELF),
+    SpellId.SKYFALL: SpellDefinition(SpellId.SKYFALL, "Meteor", 80, 10, 3, TargetKind.ALL_ENEMIES),
 })
 
 
@@ -75,9 +67,8 @@ class SpellFailure(Enum):
     STATUS_RESTRICTED = "A status-dependent casting restriction applies"
     INVALID_ACTION_ID = "Spell action ID must be a nonempty string"
     ALREADY_COMMITTED = "This spell action was already committed"
-    UNSUPPORTED_EFFECT = "Only Fire, Starstorm, and Meteor have offensive effects"
-    UNSUPPORTED_SUPPORT_EFFECT = "This executor supports only the five support spells"
-    RERAISE_USED = "Reraise has already been cast in this encounter"
+    UNSUPPORTED_EFFECT = "Only Fire and Meteor have offensive effects"
+    UNSUPPORTED_SUPPORT_EFFECT = "This executor supports only the three support spells"
 
 
 @dataclass(frozen=True)
@@ -95,7 +86,6 @@ class SpellContext:
     enemies: tuple[EnemySnapshot, ...]
     action_pending: bool = False
     statuses: tuple[StatusEffect, ...] = ()
-    reraise_used: bool = False
 
 
 @dataclass(frozen=True)
@@ -146,18 +136,6 @@ def select_targets(definition: SpellDefinition, context: SpellContext) -> SpellT
         candidates = [enemy for enemy in active if enemy.grid_row == context.player_row]
         nearest = min(candidates, key=lambda enemy: (-enemy.grid_col, enemy.enemy_id), default=None)
         return SpellTargets(kind, (nearest.enemy_id,) if nearest else ())
-    if kind is TargetKind.FRONT_AREA:
-        left, top = BATTLEFIELD_ORIGIN
-        width, height = BATTLEFIELD_SIZE
-        center = (max(left, min(left + width, context.player_position[0] - 8 * TILE_SIZE)),
-                  max(top, min(top + height, context.player_position[1])))
-        radius = 2 * TILE_SIZE
-        # Compare enemy-center distances; the circle includes its boundary.
-        active = tuple(enemy for enemy in active
-                       if ((enemy.bounds.left + enemy.bounds.right) / 2 - center[0]) ** 2
-                       + ((enemy.bounds.top + enemy.bounds.bottom) / 2 - center[1]) ** 2
-                       <= radius ** 2)
-        return SpellTargets(kind, tuple(sorted(enemy.enemy_id for enemy in active)), center, radius)
     return SpellTargets(kind, tuple(sorted(enemy.enemy_id for enemy in active)))
 
 
@@ -195,8 +173,6 @@ class SpellEngine:
             return SpellResult(failure=SpellFailure.INVALID_STATE)
         if context.stage < definition.unlock_stage:
             return SpellResult(failure=SpellFailure.STAGE_LOCKED)
-        if definition.spell_id is SpellId.RERAISE and context.reraise_used:
-            return SpellResult(failure=SpellFailure.RERAISE_USED)
         if context.mp < definition.mp_cost:
             return SpellResult(failure=SpellFailure.INSUFFICIENT_MP)
         if context.turn_index < self.next_ready_turn(definition.spell_id):
@@ -204,7 +180,7 @@ class SpellEngine:
         targets = select_targets(definition, context)
         if targets.kind is not TargetKind.SELF and not targets.enemy_ids:
             return SpellResult(failure=SpellFailure.NO_TARGET)
-        if definition.spell_id is SpellId.CURE and context.hp >= context.max_hp:
+        if definition.spell_id is SpellId.MEND and context.hp >= context.max_hp:
             return SpellResult(failure=SpellFailure.FULL_HP)
         # Status-dependent rules are deferred until supplied by a later system.
         if status_check is not None:

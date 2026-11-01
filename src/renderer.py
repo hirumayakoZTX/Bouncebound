@@ -26,19 +26,19 @@ PLAYER_SPRITE = SpriteSpec("images/player/guardian.png")
 ENEMY_SPRITES = {
     EnemyType.BASIC: SpriteSpec("images/enemies/slime.png"),
     EnemyType.BOMB: SpriteSpec("images/enemies/bomb.png"),
-    EnemyType.ULTROS: SpriteSpec("images/enemies/ultros.png"),
-    EnemyType.TYPHON: SpriteSpec("images/enemies/typhon.png"),
-    EnemyType.CACTUAR: SpriteSpec("images/enemies/cactuar.png"),
-    EnemyType.ALLIGATOR: SpriteSpec("images/enemies/alligator.png"),
-    EnemyType.BULB: SpriteSpec("images/enemies/bulb.png"),
-    EnemyType.MORBOL: SpriteSpec("images/enemies/morbol.png"),
-    EnemyType.LANDTRAP: SpriteSpec("images/enemies/landtrap.png"),
-    EnemyType.CHICHU: SpriteSpec("images/enemies/chichu.png"),
-    EnemyType.MANDRAGORA: SpriteSpec("images/enemies/mandragora.png"),
-    EnemyType.DIREMITE: SpriteSpec("images/enemies/diremite.png"),
-    EnemyType.TONBERRY: SpriteSpec("images/enemies/tonberry.png"),
-    EnemyType.GORGON: SpriteSpec("images/enemies/gorgon.png"),
-    EnemyType.ODIN: SpriteSpec("images/enemies/odin.png"),
+    EnemyType.INKMAW: SpriteSpec("images/enemies/inkmaw.png"),
+    EnemyType.GALEJAW: SpriteSpec("images/enemies/galejaw.png"),
+    EnemyType.NEEDLELING: SpriteSpec("images/enemies/needleling.png"),
+    EnemyType.MARSHMAW: SpriteSpec("images/enemies/marshmaw.png"),
+    EnemyType.SPOREBUD: SpriteSpec("images/enemies/sporebud.png"),
+    EnemyType.MAWROOT: SpriteSpec("images/enemies/mawroot.png"),
+    EnemyType.SNAPROOT: SpriteSpec("images/enemies/snaproot.png"),
+    EnemyType.BRIARHEART: SpriteSpec("images/enemies/briarheart.png"),
+    EnemyType.ROOTLING: SpriteSpec("images/enemies/rootling.png"),
+    EnemyType.VENOMCRAWLER: SpriteSpec("images/enemies/venomcrawler.png"),
+    EnemyType.HOODED_STALKER: SpriteSpec("images/enemies/hooded_stalker.png"),
+    EnemyType.THORN_SENTINEL: SpriteSpec("images/enemies/thorn_sentinel.png"),
+    EnemyType.IRON_REGENT: SpriteSpec("images/enemies/iron_regent.png"),
 }
 CRYSTAL_SPRITE = SpriteSpec("images/ui/bp_crystal.png", scale=2)
 ORB_SPRITE = SpriteSpec("images/projectiles/orb.png", scale=1)
@@ -76,13 +76,6 @@ class Renderer:
         arena = pygame.Rect(BATTLEFIELD_ORIGIN, BATTLEFIELD_SIZE)
         pygame.draw.rect(screen, (30, 43, 63), arena)
         pygame.draw.rect(screen, (102, 139, 175), arena, width=2)
-        for tile in snapshot.hazards:
-            # PoisonTiles affect the player lane, never projectile collision geometry.
-            row_rect = pygame.Rect(snapshot.player_position[0] - 24,
-                                   BATTLEFIELD_ORIGIN[1] + 48 * tile.row, 48, 48)
-            pygame.draw.rect(screen, (125, 68, 146), row_rect, width=3)
-            label = self.hud_font.render(str(tile.remaining_turns), True, (221, 158, 242))
-            screen.blit(label, row_rect.topleft)
         for enemy in snapshot.enemies:
             rect = pygame.Rect(enemy.bounds.left, enemy.bounds.top,
                                enemy.bounds.right - enemy.bounds.left,
@@ -90,19 +83,19 @@ class Renderer:
             color, prefix = {
                 EnemyType.BASIC: ((81, 158, 105), "S"),
                 EnemyType.BOMB: ((190, 75, 79), "B"),
-                EnemyType.ULTROS: ((148, 100, 204), "U"),
-                EnemyType.TYPHON: ((205, 151, 59), "T"),
-                EnemyType.CACTUAR: ((30, 125, 90), "C"),
-                EnemyType.ALLIGATOR: ((89, 113, 54), "A"),
-                EnemyType.BULB: ((159, 85, 143), "Bu"),
-                EnemyType.MORBOL: ((84, 85, 157), "M"),
-                EnemyType.LANDTRAP: ((147, 91, 48), "L"),
-                EnemyType.CHICHU: ((188, 86, 27), "Ch"),
-                EnemyType.MANDRAGORA: ((111, 119, 45), "Mn"),
-                EnemyType.DIREMITE: ((65, 98, 159), "D"),
-                EnemyType.TONBERRY: ((27, 110, 97), "T!" if enemy.enraged else "To"),
-                EnemyType.GORGON: ((132, 67, 152), "G"),
-                EnemyType.ODIN: ((108, 116, 130), "O"),
+                EnemyType.INKMAW: ((148, 100, 204), "I"),
+                EnemyType.GALEJAW: ((205, 151, 59), "G"),
+                EnemyType.NEEDLELING: ((30, 125, 90), "N"),
+                EnemyType.MARSHMAW: ((89, 113, 54), "M"),
+                EnemyType.SPOREBUD: ((159, 85, 143), "Sp"),
+                EnemyType.MAWROOT: ((84, 85, 157), "Mw"),
+                EnemyType.SNAPROOT: ((147, 91, 48), "Sn"),
+                EnemyType.BRIARHEART: ((188, 86, 27), "Br"),
+                EnemyType.ROOTLING: ((111, 119, 45), "R"),
+                EnemyType.VENOMCRAWLER: ((65, 98, 159), "V"),
+                EnemyType.HOODED_STALKER: ((27, 110, 97), "H!" if enemy.enraged else "H"),
+                EnemyType.THORN_SENTINEL: ((132, 67, 152), "Th"),
+                EnemyType.IRON_REGENT: ((108, 116, 130), "Ir"),
             }[enemy.enemy_type]
             spec = ENEMY_SPRITES.get(enemy.enemy_type)
             if spec is not None and self._draw_sprite(screen, spec, rect.center) is not None:

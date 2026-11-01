@@ -30,7 +30,10 @@ def resolve_enemy_phase(enemies: Iterable[Enemy], context: EnemyTurnContext) -> 
             continue
         if enemy.grid_col == GRID_COLUMNS - 1:
             if enemy.escape(context.turn_index):
-                context.damage_player(enemy.contact_damage)
+                if context.damage_from_enemy is not None:
+                    context.damage_from_enemy(enemy.enemy_id, enemy.contact_damage, "contact")
+                else:
+                    context.damage_player(enemy.contact_damage)
             continue
         destination = (enemy.grid_col + 1, enemy.grid_row)
         if not any(other.active and (other.grid_col, other.grid_row) == destination

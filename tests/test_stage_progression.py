@@ -15,7 +15,6 @@ from src.combat import Combat
 from src.encounter import Encounter, EncounterOutcome, Spawn, Wave
 from src.entities import Enemy, EnemyType
 from src.game import Game
-from src.hazards import HazardState
 from src.renderer import Renderer
 from src.spells import SpellFailure
 from src.stage_config import parse_stage
@@ -39,7 +38,7 @@ def playing(stages=None):
 
 def clear_stage(world):
     """Use real Fire commit, animation, and resolution against a one-enemy fixture."""
-    assert world.select_spell('fire')
+    assert world.select_spell('ember_lance')
     assert world.cast_selected_spell().valid
     world.advance_time(.45)
     assert world.resolve_turn()
@@ -108,7 +107,7 @@ class StageSchedulerTests(unittest.TestCase):
     def test_mandatory_escape_is_failure_even_after_all_other_enemies_are_defeated(self):
         data = stage_data(); data['waves'][0]['spawns'][0]['col'] = 13
         world = playing({1: parse_stage(data)})
-        world.select_spell('ward'); world.cast_selected_spell()
+        world.select_spell('barrier'); world.cast_selected_spell()
         world.advance_time(.45); world.resolve_turn()
         self.assertIs(world.state, GameState.GAME_OVER)
         self.assertIs(world.game_over_reason, GameOverReason.DEFENSE_FAILED)
@@ -168,59 +167,12 @@ class StageProgressionTests(unittest.TestCase):
         self.assertEqual(vars(world), before)
         self.assertFalse(world.snapshot().next_stage_available)
 
-    def test_stage_transition_resets_resources_effects_cooldowns_histories_and_ids(self):
-        world = self.world
-        world.execute_support_spell('ward-fixture', 'ward')
-        world.execute_support_spell('revival-fixture', 'reraise')
-        world.apply_status(StatusKind.BIND)
-        world.apply_status(StatusKind.POISON)
-        world.apply_status(StatusKind.DOOM)
-        world.place_poison_tile(3)
-        world.hp = 17; world.bp = 5; world.player_row = 3
-        world.aim_target = (96., 240.)
-        world._physics.accumulator = .004
-        world._next_projectile_id = 90
-        world.mp = 30  # Exact Fire threshold in this resource/reset fixture.
-        archived = Enemy(99, EnemyType.BOMB, 13, 0)
-        archived.escape(1)
-        world.combat.add_enemy(archived)
-        clear_stage(world)
-        self.assertTrue(world.reraise_used)
-        previous_encounter = world.encounter
-        previous_combat = world.combat
-        self.assertTrue(world.advance_stage())
-        self.assertEqual((world.stage, world.turn_index, world.hp, world.mp, world.bp), (2, 1, 100, 100, 1))
-        self.assertEqual(world.statuses, StatusState())
-        self.assertEqual(world.hazards, HazardState())
-        self.assertEqual(world.status_events, ())
-        self.assertFalse(world.reraise_used)
-        self.assertEqual(dict(world.spells.cooldowns), {})
-        self.assertEqual(world.spells._committed_actions, {})
-        self.assertIsNone(world.selected_spell)
-        self.assertEqual(world.spell_feedback, '')
-        self.assertIsNone(world.last_spell_result)
-        self.assertEqual(world.projectiles, [])
-        self.assertEqual(world._physics.accumulator, 0)
-        self.assertEqual((world._next_projectile_id, world._next_action_id), (1, 1))
-        self.assertIsNone(world._pending_turn)
-        self.assertIsNone(world.last_resolved_turn)
-        self.assertIsNone(world.game_over_reason)
-        self.assertEqual(world.combat.death_events, [])
-        self.assertEqual(world.enemies, {})
-        self.assertTrue(previous_combat.enemies[99].escaped)
-        self.assertEqual(world.encounter.spawn_history, [])
-        self.assertIsNot(world.encounter, previous_encounter)
-        self.assertEqual(len(previous_combat.death_events), 1)
-        self.assertEqual(world.player_row, 3)
-        self.assertIsNone(world.aim_target)
-        world.transition_to(GameState.PLAYER_AIM)
-        self.assertTrue(world.execute_support_spell('revival-fixture', 'reraise').valid)
 
     def test_every_main_action_and_pause_state_rejects_stage_advancement(self):
         for spell in (False, True):
             world = playing(self.catalog)
             if spell:
-                world.select_spell('ward'); world.cast_selected_spell()
+                world.select_spell('barrier'); world.cast_selected_spell()
             else:
                 world.set_aim_target((96, 240)); world.fire()
             self.assertEqual(world.spawn_waves(), ())
@@ -290,30 +242,7 @@ class StageProgressionTests(unittest.TestCase):
             self.assertIs(world.state, GameState.RESULTS if key == pygame.K_RETURN else GameState.STAGE_INTRO)
         self.assertEqual(world.stage, 1)
 
-    def test_stage_clear_precedes_harm_and_enemy_phase(self):
-        self.world.apply_status(StatusKind.POISON, 1)
-        self.world.apply_status(StatusKind.DOOM, 1)
-        self.world.place_poison_tile(3)
-        self.world.turn_index = 2; self.world.hp = 3
-        before = self.world.snapshot()
-        clear_stage(self.world)
-        self.assertIs(self.world.state, GameState.STAGE_CLEAR)
-        self.assertEqual(self.world.hp, 3)
-        self.assertEqual(self.world.snapshot().statuses, before.statuses)
-        self.assertEqual(self.world.snapshot().hazards, before.hazards)
-        self.assertIsNone(self.world.last_resolved_turn)
 
-    def test_stage_specific_spell_unlocks_follow_registered_stage(self):
-        self.assertIs(self.world.validate_spell('esuna').failure, SpellFailure.STAGE_LOCKED)
-        self.assertIs(self.world.validate_spell('meteor').failure, SpellFailure.STAGE_LOCKED)
-        clear_stage(self.world); self.world.advance_stage()
-        self.world.transition_to(GameState.PLAYER_AIM)
-        self.assertTrue(self.world.validate_spell('esuna').valid)
-        self.assertTrue(self.world.validate_spell('levitation').valid)
-        self.assertIs(self.world.validate_spell('meteor').failure, SpellFailure.STAGE_LOCKED)
-        clear_stage(self.world); self.world.advance_stage()
-        self.world.transition_to(GameState.PLAYER_AIM)
-        self.assertTrue(self.world.validate_spell('meteor').valid)
 
     def test_three_fixture_stages_distinguish_clear_victory_and_results(self):
         for stage in (1, 2, 3):

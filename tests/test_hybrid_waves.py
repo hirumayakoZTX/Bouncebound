@@ -44,7 +44,7 @@ def aiming_world(config=None):
 
 
 def finish_spell(world):
-    assert world.select_spell("fire")
+    assert world.select_spell("ember_lance")
     assert world.cast_selected_spell().valid
     world.advance_time(1.0)
     assert world.state is GameState.TURN_RESOLVE
@@ -146,7 +146,7 @@ class HybridWaveTests(unittest.TestCase):
 
     def test_spell_animation_pause_and_pending_action_block_early_spawning(self):
         world = aiming_world()
-        self.assertTrue(world.select_spell("fire"))
+        self.assertTrue(world.select_spell("ember_lance"))
         self.assertTrue(world.cast_selected_spell().valid)
         remaining = world.snapshot().spell_remaining
         self.assertEqual(world.spawn_waves(), ())
@@ -191,7 +191,7 @@ class HybridWaveTests(unittest.TestCase):
         data = stage_data()
         data["waves"][0]["spawns"][0]["col"] = 13
         world = aiming_world(parse_stage(data))
-        self.assertTrue(world.select_spell("ward"))
+        self.assertTrue(world.select_spell("barrier"))
         self.assertTrue(world.cast_selected_spell().valid)
         world.advance_time(1.0)
         world.resolve_turn()

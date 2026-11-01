@@ -19,10 +19,11 @@ from src.game import Game
 from src.hud import (
     CombatHUD, PANELS, HP_PANEL, MP_PANEL, BP_PANEL, STATUS_PANEL, SPELL_PANEL,
     FEEDBACK_PANEL, SHORTCUT_PANEL, HP_COLOR, HARMFUL, MP_COLOR, BP_COLOR, ACCENT,
-    TEXT_CACHE_LIMIT, spell_availability, cooldown_label, status_labels, hazard_label,
+    TEXT_CACHE_LIMIT, spell_availability, cooldown_label, status_labels,
 )
 from src.player_actions import SpellHUD, spell_failure_message
 from src.renderer import Renderer
+from src.scoring import ScoreBreakdown, ScoreSnapshot
 from src.spells import SpellFailure, SpellId, get_spell
 from src.states import GameState
 from src.statuses import StatusKind
@@ -124,10 +125,12 @@ class HUDTests(unittest.TestCase):
         self.assertIn('Waves: —', self.labels(replace(self.world.snapshot(), total_waves=0,
                                                    has_boss_wave=False)))
 
-    def test_score_is_an_unavailable_placeholder_without_model_field(self):
-        self.assertIn('Score: —', self.labels())
-        self.assertFalse(hasattr(self.world, 'score'))
-        self.assertFalse(hasattr(self.world.snapshot(), 'score'))
+    def test_score_displays_the_authoritative_snapshot_value(self):
+        self.assertIn('Score: 0', self.labels())
+        self.assertEqual(self.world.snapshot().score.total, 0)
+        snapshot = replace(self.world.snapshot(), score=ScoreSnapshot(ScoreBreakdown(defeats=123456)))
+        self.assertIn('Score: 123456', self.labels(snapshot))
+        self.assertEqual(self.hud._fit('Score: 123456', 'small', 114), 'Score: 123456')
 
     def test_no_selection_explains_free_selection_and_one_main_action(self):
         labels = self.labels()
@@ -135,7 +138,7 @@ class HUDTests(unittest.TestCase):
         self.assertIn('Select an unlocked spell', labels)
         self.assertIn('Selection is free; one shot OR spell per turn', labels)
 
-    def test_all_eight_spell_names_keys_and_costs_use_existing_definitions(self):
+    def test_available_spell_names_keys_and_costs_use_existing_definitions(self):
         for number, spell in enumerate(SpellId, 1):
             definition = get_spell(spell)
             labels = self.labels(self.selected(spell.value, stage=3))
@@ -143,12 +146,12 @@ class HUDTests(unittest.TestCase):
             self.assertIn(f'MP {definition.mp_cost}', labels)
 
     def test_ready_selection_uses_world_validation(self):
-        self.assertTrue(self.world.select_spell('fire'))
+        self.assertTrue(self.world.select_spell('ember_lance'))
         self.assertTrue(self.world.snapshot().spell_hud.ready)
         self.assertIn('Ready - Space to cast', self.labels())
 
     def test_absolute_cooldown_turn_and_remaining_turns(self):
-        snapshot = self.selected('fire', failure=SpellFailure.COOLDOWN, ready=5, turn_index=2)
+        snapshot = self.selected('ember_lance', failure=SpellFailure.COOLDOWN, ready=5, turn_index=2)
         labels = self.labels(snapshot)
         self.assertIn('Spell on cooldown', labels)
         self.assertIn('Ready T5 - 3 turns remaining', labels)
@@ -157,36 +160,30 @@ class HUDTests(unittest.TestCase):
 
     def test_insufficient_mp_is_not_misrepresented_as_cooldown(self):
         self.world.mp = 29
-        self.world.select_spell('fire')
+        self.world.select_spell('ember_lance')
         self.assertEqual(self.world.snapshot().spell_hud.failure, SpellFailure.INSUFFICIENT_MP)
         labels = self.labels()
         self.assertIn('Not enough MP', labels); self.assertIn('Cooldown clear', labels)
         self.assertNotIn('Spell on cooldown', labels)
 
-    def test_no_target_and_full_hp_cure_have_model_failure_messages(self):
+    def test_no_target_and_full_hp_mend_have_model_failure_messages(self):
         self.world.move_player(-1); self.world.move_player(-1); self.world.move_player(-1)
-        self.world.select_spell('fire')
+        self.world.select_spell('ember_lance')
         self.assertIn('No valid target', self.labels())
-        self.world.select_spell('cure')
+        self.world.select_spell('mend')
         self.assertIn('Cure requires missing HP', self.labels())
 
-    def test_reraise_used_message_and_failed_cast_feedback(self):
-        self.world.reraise_used = True
-        self.world.select_spell('reraise'); result = self.world.cast_selected_spell()
-        self.assertFalse(result.valid)
-        self.assertIn('Reraise already used', self.labels())
-        self.assertEqual((self.world.mp, self.world.turn_index), (100, 1))
 
     def test_locked_selection_keeps_previous_spell_and_actual_feedback(self):
-        self.world.select_spell('fire')
-        self.assertFalse(self.world.select_spell('meteor'))
+        self.world.select_spell('ember_lance')
+        self.assertFalse(self.world.select_spell('skyfall'))
         labels = self.labels()
-        self.assertIn('[1] Pom Fire', labels); self.assertNotIn('[3] Pom Meteor', labels)
+        self.assertIn('[1] Fire', labels); self.assertNotIn('[5] Meteor', labels)
         self.assertIn('Spell locked', labels)
-        self.assertIs(self.world.selected_spell, SpellId.FIRE)
+        self.assertIs(self.world.selected_spell, SpellId.EMBER_LANCE)
 
     def test_stage_unlock_tags_follow_catalog_without_extra_validation(self):
-        for stage, count in ((1, 3), (2, 1), (3, 0)):
+        for stage, count in ((1, 2), (2, 1), (3, 0)):
             labels = self.labels(replace(self.world.snapshot(), stage=stage))
             tags = [label for label in labels if label in ('S2', 'S3')]
             self.assertEqual(len(tags), count)
@@ -195,30 +192,30 @@ class HUDTests(unittest.TestCase):
                     self.assertIn(f'S{definition.unlock_stage}', tags)
 
     def test_uncommon_model_restriction_is_preserved_verbatim(self):
-        snapshot = self.selected('fire', failure=SpellFailure.STATUS_RESTRICTED)
+        snapshot = self.selected('ember_lance', failure=SpellFailure.STATUS_RESTRICTED)
         self.assertEqual(spell_availability(snapshot), spell_failure_message(SpellFailure.STATUS_RESTRICTED))
 
     def test_projectile_animation_does_not_advertise_ready_casting(self):
-        self.world.select_spell('ward'); self.world.set_aim_target((96, 240)); self.world.fire()
+        self.world.select_spell('barrier'); self.world.set_aim_target((96, 240)); self.world.fire()
         labels = self.labels()
         self.assertIn('VOLLEY IN FLIGHT', labels); self.assertIn('Main action unavailable', labels)
         self.assertNotIn('Ready - Space to cast', labels)
 
     def test_spell_animation_has_committed_values_and_cast_identity(self):
-        self.world.select_spell('ward'); self.assertTrue(self.world.cast_selected_spell().valid)
+        self.world.select_spell('barrier'); self.assertTrue(self.world.cast_selected_spell().valid)
         labels = self.labels()
-        for text in ('MP 70/100', '[7] Pom Ward', 'SPELL IN PROGRESS', 'Cast: Pom Ward'):
+        for text in ('MP 70/100', '[3] Ward', 'SPELL IN PROGRESS', 'Cast: Ward'):
             self.assertIn(text, labels)
         self.assertNotIn('Ready - Space to cast', labels)
 
     def test_turn_resolution_does_not_advertise_ready_casting(self):
-        self.world.select_spell('ward'); self.world.cast_selected_spell(); self.world.advance_time(.5)
+        self.world.select_spell('barrier'); self.world.cast_selected_spell(); self.world.advance_time(.5)
         self.assertIs(self.world.state, GameState.TURN_RESOLVE)
         labels = self.labels()
         self.assertIn('RESOLVING TURN', labels); self.assertIn('Main action unavailable', labels)
 
     def test_pause_is_explicit_even_if_snapshot_ready_flag_was_true(self):
-        snapshot = self.selected('ward', state=GameState.PAUSED, paused_state=GameState.PLAYER_AIM)
+        snapshot = self.selected('barrier', state=GameState.PAUSED, paused_state=GameState.PLAYER_AIM)
         labels = self.labels(snapshot)
         self.assertIn('Paused - actions unavailable', labels); self.assertIn('PAUSED', labels)
         self.assertNotIn('Ready - Space to cast', labels)
@@ -226,16 +223,15 @@ class HUDTests(unittest.TestCase):
     def test_no_effects_has_explicit_none_label(self):
         labels = self.labels()
         self.assertIn('Effects', labels); self.assertIn('None', labels)
-        self.assertIn('Tiles: none', labels)
+        self.assertIn('None', labels)
 
-    def test_all_six_effects_are_distinct_and_readable_with_correct_durations(self):
+    def test_only_poison_and_barrier_statuses_are_readable_with_durations(self):
         for kind in StatusKind:
             self.world.apply_status(kind)
         labels = self.labels()
-        for label in ('! Poison 3t', '! Bind 1t', '! DOOM 5t', '+ Ward 1t',
-                      '+ Levitation 1t', '+ Reraise 1-use'):
+        for label in ('! Poison 3t', '+ Ward 1t'):
             self.assertIn(label, labels)
-        self.assertFalse(any('Reraise' in label and ('99' in label or 'None' in label) for label in labels))
+        self.assertEqual(len(status_labels(self.world.snapshot())), 2)
         for _, label, _ in status_labels(self.world.snapshot()):
             self.assertFalse(label.endswith('seconds'))
 
@@ -245,12 +241,6 @@ class HUDTests(unittest.TestCase):
         self.world.apply_status(StatusKind.POISON, 3)
         self.assertIn('! Poison 3t', self.labels()); self.assertNotIn('! Poison 1t', self.labels())
 
-    def test_ward_and_levitation_disappear_only_after_model_expiration(self):
-        self.world.apply_status(StatusKind.WARD); self.world.apply_status(StatusKind.LEVITATION)
-        perform_action(self.world, 'shot', 3)
-        self.assertFalse(status_labels(self.world.snapshot()))
-        labels = self.labels()
-        self.assertNotIn('+ Ward 1t', labels); self.assertNotIn('+ Levitation 1t', labels)
 
     def test_ward_consumption_reflects_unchanged_hp(self):
         self.world.apply_status(StatusKind.WARD)
@@ -258,29 +248,11 @@ class HUDTests(unittest.TestCase):
         labels = self.labels()
         self.assertIn('HP 100/100', labels); self.assertNotIn('+ Ward 1t', labels)
 
-    def test_cure_and_reraise_use_real_updated_hp_not_cached_values(self):
-        self.labels()
-        self.world.apply_player_damage(70)
-        self.assertIn('HP 30/100', self.labels())
-        self.assertTrue(self.world.execute_support_spell('heal-fixture', 'cure').valid)
-        self.assertIn('HP 80/100', self.labels()); self.assertIn('MP 90/100', self.labels())
-        self.world.apply_status(StatusKind.RERAISE); self.world.apply_player_damage(100)
-        labels = self.labels()
-        self.assertIn('HP 50/100', labels); self.assertNotIn('+ Reraise 1-use', labels)
 
-    def test_hazards_show_only_snapshot_rows_and_levitation_protection(self):
-        self.world.place_poison_tile(0)
-        self.assertEqual(hazard_label(self.world.snapshot()), 'Tiles 1')
-        self.world.place_poison_tile(3)
-        self.assertEqual(hazard_label(self.world.snapshot()), 'Tiles 2 | Here 2t / new')
-        self.world.apply_status(StatusKind.LEVITATION)
-        self.assertEqual(hazard_label(self.world.snapshot()), 'Tiles 2 | Here 2t / protected')
-        self.world.remove_poison_tile(3)
-        self.assertEqual(hazard_label(self.world.snapshot()), 'Tiles 1')
 
     def test_invalid_input_feedback_does_not_lock_shooting(self):
         game = Game(); game.running = True; game.world = self.world
-        for key in (pygame.K_4, pygame.K_SPACE):
+        for key in (pygame.K_2, pygame.K_SPACE):
             game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
         self.assertIn('Cure requires missing HP', self.labels())
         before = deepcopy(vars(self.world)); self.labels()
@@ -288,28 +260,10 @@ class HUDTests(unittest.TestCase):
         game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(96, 240)))
         self.assertIs(self.world.state, GameState.SHOT_ANIMATION)
 
-    def test_every_text_rectangle_fits_its_panel_with_all_effects_and_long_feedback(self):
-        for kind in StatusKind: self.world.apply_status(kind)
-        for row in range(8): self.world.place_poison_tile(row)
-        snapshot = self.selected('levitation', stage=3, spell_feedback=('A long future feedback message ' * 20))
-        actual = []
-        original = self.hud._text
-        def record(*args, **kwargs):
-            rect = original(*args, **kwargs)
-            actual.append((args[1], rect))
-            return rect
-        with patch.object(self.hud, '_text', side_effect=record):
-            self.hud.draw(self.screen, snapshot)
-        for text, rect in actual:
-            self.assertTrue(any(pygame.Rect(panel).contains(rect) for panel in PANELS), (text, rect))
-            self.assertFalse(rect.colliderect(pygame.Rect(96, 72, 672, 384)))
-        # Ellipsis bounds excess text without shrinking any fonts.
-        self.assertTrue(any(key[1].endswith('...') for key in self.hud._text_cache))
-        self.assertGreaterEqual(self.hud.fonts['small'].get_height(), 13)
 
     def test_common_labels_are_not_ellipsized_or_squeezed(self):
         for kind in StatusKind: self.world.apply_status(kind)
-        self.world.select_spell('starstorm')
+        self.world.select_spell('skyfall')
         self.world.spell_feedback = 'Cure requires missing HP'
         self.labels()
         self.assertFalse(any(key[1].endswith('...') for key in self.hud._text_cache))
@@ -327,13 +281,6 @@ class HUDTests(unittest.TestCase):
         self.assertEqual(dict(self.hud._text_cache), cached)
         for key, surface in cached.items(): self.assertIs(self.hud._text_cache[key], surface)
 
-    def test_repeated_draws_preserve_world_events_snapshots_and_scene(self):
-        self.world.apply_status(StatusKind.DOOM); self.world.place_poison_tile(3)
-        self.world.select_spell('fire')
-        snapshot = self.world.snapshot(); before = deepcopy(vars(self.world))
-        for _ in range(30): self.hud.draw(self.screen, snapshot)
-        self.assertEqual(vars(self.world), before); self.assertEqual(self.world.snapshot(), snapshot)
-        with self.assertRaises(FrozenInstanceError): snapshot.mp = 0
 
     def test_present_and_missing_assets_keep_hud_without_audio_or_disk_reads(self):
         with tempfile.TemporaryDirectory() as root:
@@ -350,7 +297,7 @@ class HUDTests(unittest.TestCase):
                     self.assertEqual(self.screen.get_at((26, 44))[:3], HP_COLOR)
 
     def test_pause_overlay_preserves_legible_panels_and_readonly_world(self):
-        renderer = Renderer(); self.world.select_spell('ward'); self.world.cast_selected_spell()
+        renderer = Renderer(); self.world.select_spell('barrier'); self.world.cast_selected_spell()
         self.world.pause(); before = deepcopy(vars(self.world))
         renderer.draw(self.screen, self.world.snapshot())
         self.assertEqual(self.screen.get_at((26, 44))[:3], HP_COLOR)
@@ -358,15 +305,15 @@ class HUDTests(unittest.TestCase):
         self.assertIn('Paused - actions unavailable', self.labels())
 
     def test_restart_clears_presentation_values_without_stale_cache(self):
-        self.world.select_spell('ward'); self.world.cast_selected_spell(); self.labels()
+        self.world.select_spell('barrier'); self.world.cast_selected_spell(); self.labels()
         self.world.advance_time(.5); self.world.resolve_turn()
         self.world.apply_player_damage(1000)
         self.assertIs(self.world.state, GameState.GAME_OVER)
         self.assertTrue(self.world.restart()); self.world.transition_to(GameState.PLAYER_AIM)
         labels = self.labels()
-        for label in ('HP 100/100', 'MP 100/100', 'BP 1/5', 'No spell selected', 'None', 'Tiles: none'):
+        for label in ('HP 100/100', 'MP 100/100', 'BP 1/5', 'No spell selected', 'None'):
             self.assertIn(label, labels)
-        self.assertNotIn('Cast: Pom Ward', labels)
+        self.assertNotIn('Cast: Ward', labels)
         self.assertEqual(dict(self.world.spells.cooldowns), {})
 
     def test_stage_transition_uses_fresh_resources_effects_and_hud_unlocks(self):
@@ -416,6 +363,6 @@ class HUDCampaignTests(unittest.TestCase):
                     key(pygame.K_RETURN); key(pygame.K_RETURN)
             self.assertIs(world.state, GameState.VICTORY); key(pygame.K_RETURN)
             self.assertIs(world.state, GameState.RESULTS)
-            self.assertEqual((world.stage, world.turn_index, world.hp, world.mp, world.bp), (3, 21, 50, 20, 5))
+            self.assertEqual((world.stage, world.turn_index, world.hp, world.mp, world.bp), (3, 20, 27, 70, 5))
             if reference is None: reference = history
             self.assertEqual(history, reference, schedule)

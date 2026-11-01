@@ -35,13 +35,12 @@ class SpellHUD:
 
 
 SPELL_FEEDBACK = MappingProxyType({
-    SpellFailure.NO_SELECTION: "Select a spell with 1-8",
+    SpellFailure.NO_SELECTION: "Select a spell with 1-5",
     SpellFailure.INSUFFICIENT_MP: "Not enough MP",
     SpellFailure.COOLDOWN: "Spell on cooldown",
     SpellFailure.STAGE_LOCKED: "Spell locked",
     SpellFailure.NO_TARGET: "No valid target",
     SpellFailure.FULL_HP: "Cure requires missing HP",
-    SpellFailure.RERAISE_USED: "Reraise already used",
     SpellFailure.INVALID_STATE: "Main action unavailable",
 })
 

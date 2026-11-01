@@ -145,7 +145,7 @@ class StageConfigTests(unittest.TestCase):
     def test_spawn_ids_coordinates_and_kinds_are_strict(self):
         bad = {'id': (0, -1, True, 1.0, [], '1'),
                'col': (-1, 14, True, .5, '0'), 'row': (-1, 8, True, .5, '3'),
-               'kind': ('ultros', 'missing', [], None, 1)}
+               'kind': ('inkmaw', 'missing', [], None, 1)}
         for key, values in bad.items():
             for value in values:
                 data = stage_data(); data['waves'][0]['spawns'][0][key] = value
@@ -183,15 +183,15 @@ class StageConfigTests(unittest.TestCase):
     def boss_data(self):
         data = stage_data()
         data['boss_wave'] = {'when': 'after_scripted_waves_cleared', 'spawns': [
-            {'id': 3, 'kind': 'ultros', 'col': 0, 'row': 2},
-            {'id': 4, 'kind': 'typhon', 'col': 0, 'row': 5}]}
+            {'id': 3, 'kind': 'inkmaw', 'col': 0, 'row': 2},
+            {'id': 4, 'kind': 'galejaw', 'col': 0, 'row': 5}]}
         data['completion']['mandatory_enemy_ids'] += [3, 4]
         return data
 
-    def test_odin_boss_contract_now_activates_only_after_scripted_clear(self):
+    def test_iron_regent_boss_contract_activates_only_after_scripted_clear(self):
         data = stage_data(3)
         data['boss_wave'] = {'when': 'after_scripted_waves_cleared', 'spawns': [
-            {'id': 3, 'kind': 'odin', 'col': 0, 'row': 2}]}
+            {'id': 3, 'kind': 'iron_regent', 'col': 0, 'row': 2}]}
         data['completion']['mandatory_enemy_ids'].append(3)
         definition = parse_stage(data)
         self.assertTrue(definition.playable)
@@ -233,7 +233,7 @@ class StageConfigTests(unittest.TestCase):
         for value in ('turn_5', 1, [], None):
             data = self.boss_data(); data['boss_wave']['when'] = value
             self.reject(data)
-        for kind in ('basic', 'chichu', 'odin', 'unknown', []):
+        for kind in ('basic', 'briarheart', 'iron_regent', 'unknown', []):
             data = self.boss_data(); data['boss_wave']['spawns'][0]['kind'] = kind
             self.reject(data)
 
