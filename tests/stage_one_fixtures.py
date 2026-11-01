@@ -14,8 +14,8 @@ DEFENSE_ROWS = (0,) * 12 + (1, 4, 1) + (0,) * 5
 def boss_definition(*, scripted=False, col=7, rows=(2, 5), reverse=False, capacity=25):
     spawns = ([{'id': 1, 'kind': 'basic', 'col': 0, 'row': 3}] if scripted else [])
     spawns.append({'id': 2, 'kind': 'crystal', 'col': 0, 'row': 7})
-    bosses = [{'id': 100, 'kind': 'ultros', 'col': col, 'row': rows[0]},
-              {'id': 101, 'kind': 'typhon', 'col': col, 'row': rows[1]}]
+    bosses = [{'id': 100, 'kind': 'inkmaw', 'col': col, 'row': rows[0]},
+              {'id': 101, 'kind': 'galejaw', 'col': col, 'row': rows[1]}]
     return parse_stage({
         'schema_version': 1, 'stage': 1, 'capacity': capacity,
         'waves': [{'turn': 1, 'spawns': spawns}],

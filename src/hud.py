@@ -42,12 +42,10 @@ BENEFICIAL = (151, 232, 199)
 TEXT_CACHE_LIMIT = 128
 
 STATUS_NAMES = {
-    StatusKind.POISON: 'Poison', StatusKind.BIND: 'Bind', StatusKind.DOOM: 'DOOM',
-    StatusKind.WARD: 'Ward', StatusKind.LEVITATION: 'Levitation', StatusKind.RERAISE: 'Reraise',
+    StatusKind.POISON: 'Poison', StatusKind.WARD: 'Ward',
 }
 STATUS_WIDTHS = {
-    StatusKind.POISON: 96, StatusKind.BIND: 80, StatusKind.DOOM: 96,
-    StatusKind.WARD: 88, StatusKind.LEVITATION: 112, StatusKind.RERAISE: 132,
+    StatusKind.POISON: 96, StatusKind.WARD: 88,
 }
 
 
@@ -80,27 +78,10 @@ def status_labels(snapshot: WorldSnapshot) -> tuple[tuple[StatusKind, str, bool]
     for effect in snapshot.statuses:
         if effect.applied_turn > snapshot.turn_index:
             continue
-        duration = ('1-use' if effect.kind is StatusKind.RERAISE else
-                    f'{effect.remaining_turns}t' if effect.remaining_turns is not None else 'active')
+        duration = f'{effect.remaining_turns}t' if effect.remaining_turns is not None else 'active'
         prefix = '+' if effect.beneficial else '!'
         result.append((effect.kind, f'{prefix} {STATUS_NAMES[effect.kind]} {duration}', effect.beneficial))
     return tuple(result)
-
-
-def hazard_label(snapshot: WorldSnapshot) -> str:
-    if not snapshot.hazards:
-        return 'Tiles: none'
-    here = next((tile for tile in snapshot.hazards if tile.row == snapshot.player_row), None)
-    label = f'Tiles {len(snapshot.hazards)}'
-    if here is not None:
-        label += f' | Here {here.remaining_turns}t'
-        floating = any(effect.kind is StatusKind.LEVITATION and effect.applied_turn <= snapshot.turn_index
-                       for effect in snapshot.statuses)
-        if floating:
-            label += ' / protected'
-        elif here.applied_turn == snapshot.turn_index:
-            label += ' / new'
-    return label
 
 
 class CombatHUD:
@@ -193,8 +174,6 @@ class CombatHUD:
             pygame.draw.rect(screen, color, chip, width=1)
             self._text(screen, label, (x + 5, rect.y + 5), width=chip.w - 10, font='small', color=color)
             x += chip.w + 4
-        self._text(screen, hazard_label(snapshot), (rect.right - 218, rect.y + 5),
-                   width=208, font='small', color=MUTED)
 
     def _spell(self, screen: pygame.Surface, snapshot: WorldSnapshot) -> None:
         rect = self._panel(screen, SPELL_PANEL)
@@ -247,7 +226,7 @@ class CombatHUD:
                 pygame.draw.rect(screen, ACCENT, cell, width=1)
             self._text(screen, str(index + 1), (cell.x + 3, cell.y + 2), width=12,
                        font='small', color=ACCENT if selected else color)
-            self._text(screen, definition.name.removeprefix('Pom '), (cell.x + 21, cell.y + 2),
+            self._text(screen, definition.name, (cell.x + 21, cell.y + 2),
                        width=79 if locked else 100, font='small', color=color)
             if locked:
                 self._text(screen, f'S{definition.unlock_stage}', (cell.right - 19, cell.y + 2),

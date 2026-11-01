@@ -11,19 +11,17 @@ from src.spells import (
     SpellCast, SpellContext, SpellDefinition, SpellEngine, SpellFailure, SpellId,
     SpellOwner, SpellResult, StatusCheck,
 )
-from src.statuses import ESUNA_REMOVABLE, StatusEffect, StatusKind, StatusState
+from src.statuses import CLEANSE_REMOVABLE, StatusEffect, StatusKind, StatusState
 
 
-CURE_HEALING = 50
-SUPPORT_SPELLS = frozenset({SpellId.CURE, SpellId.ESUNA, SpellId.LEVITATION,
-                          SpellId.WARD, SpellId.RERAISE})
+MEND_HEALING = 50
+SUPPORT_SPELLS = frozenset({SpellId.MEND, SpellId.CLEANSE, SpellId.BARRIER})
 
 
 class SupportOwner(SpellOwner, Protocol):
     hp: int
     max_hp: int
     statuses: StatusState
-    reraise_used: bool
 
 
 @dataclass(frozen=True)
@@ -33,16 +31,9 @@ class SupportChanges:
     removed: tuple[StatusEffect, ...]
     granted: StatusEffect | None
     refreshed: bool
-    reraise_used: bool
-    reraise_active: bool
-
     @property
     def healed(self) -> int:
         return self.hp_after - self.hp_before
-
-    @property
-    def reraise_available(self) -> bool:
-        return not self.reraise_used
 
 
 @dataclass(frozen=True)
@@ -67,9 +58,7 @@ def execute_support(action_id: str, spell_id: SpellId | str, owner: SupportOwner
                     engine: SpellEngine, *, status_check: StatusCheck | None = None) -> SupportSpellResult:
     """Revalidate/pay through the shared ledger, then apply one support change.
 
-    Successful support execution consumes Reraise's encounter allowance. A prior
-    payment-only action cannot be replayed to grant effects. Removing an active
-    Reraise record does not restore the separate encounter allowance.
+    A prior payment-only action cannot be replayed to grant effects.
     """
     def eligible(definition: SpellDefinition, context: SpellContext) -> SpellFailure | None:
         if definition.spell_id not in SUPPORT_SPELLS:
@@ -84,21 +73,16 @@ def execute_support(action_id: str, spell_id: SpellId | str, owner: SupportOwner
     removed = ()
     granted = None
     refreshed = False
-    if cast.spell_id is SpellId.CURE:
-        owner.hp = min(owner.max_hp, owner.hp + CURE_HEALING)
-    elif cast.spell_id is SpellId.ESUNA:
-        removed = tuple(effect for effect in owner.statuses.snapshot() if effect.kind in ESUNA_REMOVABLE)
+    if cast.spell_id is SpellId.MEND:
+        owner.hp = min(owner.max_hp, owner.hp + MEND_HEALING)
+    elif cast.spell_id is SpellId.CLEANSE:
+        removed = tuple(effect for effect in owner.statuses.snapshot()
+                        if effect.kind in CLEANSE_REMOVABLE)
         for effect in removed:
             owner.statuses.remove(effect.kind, turn=cast.casting_turn)
     else:
-        # Grant state; World handles protection and revival through unified damage resolution.
-        kind = StatusKind(cast.spell_id.value)
-        granted = StatusEffect(kind, None if kind is StatusKind.RERAISE else 1,
-                               cast.casting_turn, source_id=action_id,
-                               charges=1 if kind in (StatusKind.WARD, StatusKind.RERAISE) else None)
+        granted = StatusEffect(StatusKind.WARD, 1, cast.casting_turn,
+                               source_id=action_id, charges=1)
         refreshed = owner.statuses.put(granted) is not None
-        if kind is StatusKind.RERAISE:
-            owner.reraise_used = True
-    changes = SupportChanges(hp_before, owner.hp, removed, granted, refreshed,
-                             owner.reraise_used, owner.statuses.get(StatusKind.RERAISE) is not None)
+    changes = SupportChanges(hp_before, owner.hp, removed, granted, refreshed)
     return SupportSpellResult(commit, changes)

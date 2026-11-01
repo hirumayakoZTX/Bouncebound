@@ -17,7 +17,8 @@ from src.combat import Combat, CombatObservation
 from src.demo import create_demo_combat
 from src.encounter import Encounter, EncounterDefinition, EncounterOutcome
 from src.entities import (
-    Crystal, CrystalSnapshot, Enemy, EnemySnapshot, EnemyTurnContext, validate_damage,
+    Crystal, CrystalSnapshot, Enemy, EnemySnapshot, EnemyTurnContext, ENEMY_NAMES,
+    validate_damage,
 )
 from src.turns import resolve_enemy_phase
 from src.stage_config import load_stage, validate_stage_registry
@@ -26,13 +27,13 @@ from src.spells import (
 )
 from src.offensive_spells import OFFENSIVE_DAMAGE, OffensiveSpellResult, execute_offensive
 from src.statuses import StatusEffect, StatusEvent, StatusEventKind, StatusKind, StatusState
-from src.hazards import HazardState, PoisonTile
 from src.status_runtime import process_status_phase
 from src.support_spells import SupportSpellResult, execute_support
 from src.player_actions import (
     ActionKind, MainAction, SpellHUD, SPELL_ANIMATION_SECONDS, spell_failure_message,
 )
 from src.scoring import ScoreManager, ScoreSnapshot
+from src.persistence import HighScoreSnapshot, HighScoreStore
 
 
 STAGE_ONE = load_stage("stage_01.json")
@@ -88,11 +89,10 @@ class WorldSnapshot:
     pending_bp: int
     last_resolved_turn: int | None
     game_over_reason: GameOverReason | None
+    death_cause: str | None
     spawned_waves: int
     total_waves: int
     statuses: tuple[StatusEffect, ...] = ()
-    reraise_used: bool = False
-    hazards: tuple[PoisonTile, ...] = ()
     status_events: tuple[StatusEvent, ...] = ()
     selected_spell: SpellId | None = None
     spell_hud: SpellHUD | None = None
@@ -109,12 +109,14 @@ class WorldSnapshot:
     instructions_page: int = 0
     combat_observations: tuple[CombatObservation, ...] = ()
     score: ScoreSnapshot = ScoreSnapshot()
+    high_scores: HighScoreSnapshot = HighScoreSnapshot()
 
 
 class World:
     def __init__(self, *, demo: bool | None = None,
                  encounter: EncounterDefinition | None = None,
-                 stages: Mapping[int, EncounterDefinition] | None = None) -> None:
+                 stages: Mapping[int, EncounterDefinition] | None = None,
+                 high_score_store: HighScoreStore | None = None) -> None:
         # Explicit demo modes retain the small regression fixtures used by earlier systems.
         if demo is not None and (type(demo) is not bool or encounter is not None):
             raise ValueError("Choose either a demo fixture or an encounter definition")
@@ -126,6 +128,9 @@ class World:
                        else {1: STAGE_ONE, 2: STAGE_TWO, 3: STAGE_THREE})
         self._stage_definitions = validate_stage_registry(definitions)
         self._demo = demo
+        self.high_score_store = high_score_store
+        self.high_scores = (high_score_store.load() if high_score_store is not None
+                            else HighScoreSnapshot())
         self._encounter_definition = self._stage_definitions[1] if demo is None else None
         self.reset()
 
@@ -161,17 +166,20 @@ class World:
 
     def reset(self) -> None:
         """Restore the menu and all data currently owned by the run."""
+        self.high_scores = replace(
+            self.high_scores, saved=None, new_record=None,
+            message=("High score loaded." if self.high_scores.available
+                     else self.high_scores.message),
+        )
         self.stage = 1
         self.turn_index = 1
         self.hp = self.max_hp = 100
         self.mp = self.max_mp = 100
         self.spells = SpellEngine()
         self.statuses = StatusState()
-        self.hazards = HazardState()
         self.score = ScoreManager()
         self._score_death_cursor = 0
         self._shot_targets: set[int] = set()
-        self.reraise_used = False
         self.bp = 1
         self.player_row = INITIAL_PLAYER_ROW
         self.aim_target: tuple[float, float] | None = None
@@ -192,7 +200,9 @@ class World:
         self.last_spell_result: OffensiveSpellResult | SupportSpellResult | None = None
         self.last_resolved_turn: int | None = None
         self.game_over_reason: GameOverReason | None = None
+        self.death_cause: str | None = None
         self._cleared_stage: int | None = None
+        self._campaign_save_attempted = False
 
     @property
     def _pending_turn(self) -> int | None:
@@ -279,7 +289,7 @@ class World:
         """Enter a registered next encounter after an authorized clear.
 
         Each stage starts a fresh encounter clock and clears cooldowns, effects,
-        Reraise allowance, histories, and identifiers along with HP/MP/BP reset.
+        histories, and identifiers along with HP/MP/BP reset.
         The default application registers all three canonical encounters.
         """
         if not self.can_advance_stage:
@@ -385,8 +395,7 @@ class World:
     def move_player(self, delta_row: int) -> bool:
         """Move a single row during aiming without spending a turn or resources."""
         if (self.state is not GameState.PLAYER_AIM
-                or type(delta_row) is not int or delta_row not in (-1, 1)
-                or self.statuses.is_active(StatusKind.BIND, self.turn_index)):
+                or type(delta_row) is not int or delta_row not in (-1, 1)):
             return False
         next_row = self.player_row + delta_row
         if not 0 <= next_row < GRID_ROWS:
@@ -491,7 +500,7 @@ class World:
             enemies=tuple(enemy.snapshot() for enemy in sorted(
                 self.enemies.values(), key=lambda enemy: enemy.enemy_id) if enemy.active),
             action_pending=bool(self.projectiles) or self._pending_action is not None,
-            statuses=self.statuses.snapshot(), reraise_used=self.reraise_used,
+            statuses=self.statuses.snapshot(),
         )
 
     def validate_spell(self, spell_id: SpellId | str, *,
@@ -524,76 +533,81 @@ class World:
     def apply_status(self, kind: StatusKind, duration: int | None = None, *,
                      source_id: int | str | None = None) -> StatusEvent:
         """Direct model placement for fixtures and future abilities; no spell payment."""
-        defaults = {StatusKind.POISON: 3, StatusKind.BIND: 1, StatusKind.DOOM: 5,
-                    StatusKind.WARD: 1, StatusKind.LEVITATION: 1, StatusKind.RERAISE: None}
+        defaults = {StatusKind.POISON: 3, StatusKind.WARD: 1}
         if not isinstance(kind, StatusKind):
             raise ValueError("Status kind must be a StatusKind")
         effect = StatusEffect(kind, defaults[kind] if duration is None else duration,
                               self.turn_index, source_id,
-                              charges=1 if kind in (StatusKind.WARD, StatusKind.RERAISE) else None)
+                              charges=1 if kind is StatusKind.WARD else None)
         self.statuses.put(effect)
         return self.status_events[-1]
 
-    def place_poison_tile(self, row: int, duration: int = 2, *,
-                          source_id: int | str | None = None) -> StatusEvent:
-        event = self.hazards.put(PoisonTile(row, duration, self.turn_index, source_id))
-        self.statuses.record(event)
-        return event
-
-    def remove_poison_tile(self, row: int) -> PoisonTile | None:
-        tile = self.hazards.remove(row)
-        if tile is not None:
-            self.statuses.record(StatusEvent(StatusEventKind.HAZARD_REMOVED, self.turn_index,
-                                              row=row, source_id=tile.source_id))
-        return tile
-
     def apply_player_damage(self, amount: int, *, source: str = "direct",
                             row: int | None = None) -> int:
-        """Return actual HP lost before any revival; Ward covers ordinary damage."""
+        """Return actual HP lost; Ward covers one ordinary damage event."""
         validate_damage(amount)
-        return self._resolve_player_damage(amount, source=source, row=row, forced=False)
-
-    def force_player_knockout(self, *, source: str = "doom") -> int:
-        """Forced knockout bypasses Ward, while still allowing one Reraise."""
-        return self._resolve_player_damage(0, source=source, row=None, forced=True)
-
-    def _resolve_player_damage(self, amount: int, *, source: str,
-                               row: int | None, forced: bool) -> int:
-        if self.state not in ACTIVE_STATES or self.hp <= 0 or (not forced and amount == 0):
+        if self.state not in ACTIVE_STATES or self.hp <= 0 or amount == 0:
             return 0
         before = self.hp
-        if not forced and self.statuses.is_active(StatusKind.WARD, self.turn_index):
+        if self.statuses.is_active(StatusKind.WARD, self.turn_index):
             self.statuses.record(StatusEvent(StatusEventKind.WARD_BLOCKED, self.turn_index,
                                               StatusKind.WARD, row=row, source_id=source,
                                               attempted_damage=amount, hp_before=before, hp_after=before))
             self.statuses.remove(StatusKind.WARD, turn=self.turn_index)
             return 0
-        self.hp = 0 if forced else max(0, before - amount)
+        self.hp = max(0, before - amount)
         lost = before - self.hp
         self.score.record_damage(lost)
-        kind = (StatusEventKind.FORCED_KNOCKOUT if forced else
-                StatusEventKind.POISON_DAMAGE if source == "poison" else
-                StatusEventKind.HAZARD_DAMAGE if source == "poison_tile" else StatusEventKind.DAMAGE)
+        poison_damage = source == "poison" or source.startswith("poison:")
+        kind = StatusEventKind.POISON_DAMAGE if poison_damage else StatusEventKind.DAMAGE
         self.statuses.record(StatusEvent(kind, self.turn_index, row=row, source_id=source,
-                                          amount=lost, attempted_damage=before if forced else amount,
+                                          amount=lost, attempted_damage=amount,
                                           hp_before=before, hp_after=self.hp))
         if self.hp == 0:
-            revival = self.statuses.get(StatusKind.RERAISE)
-            if revival is not None and self.statuses.is_active(StatusKind.RERAISE, self.turn_index):
-                self.statuses.remove(StatusKind.RERAISE, turn=self.turn_index)
-                self.hp = revival.revival_hp
-                self.statuses.record(StatusEvent(StatusEventKind.RERAISE_ACTIVATED, self.turn_index,
-                                                  StatusKind.RERAISE, source_id=revival.source_id,
-                                                  amount=self.hp, hp_before=0, hp_after=self.hp))
-            else:
-                self._end_run(GameOverReason.HP_DEPLETED)
+            self.death_cause = self._describe_death_source(source)
+            self._end_run(GameOverReason.HP_DEPLETED)
         return lost
+
+    def _describe_death_source(self, source: str) -> str:
+        if source == "poison" or source.startswith("poison:"):
+            parts = source.split(":", 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                enemy = self.enemies.get(int(parts[1]))
+                if enemy is not None:
+                    return f"Poison from {ENEMY_NAMES[enemy.enemy_type]} dealt the final damage."
+            return "Poison dealt the final damage."
+        if source.startswith("enemy:"):
+            _, raw_id, action = source.split(":", 2)
+            enemy = self.enemies.get(int(raw_id)) if raw_id.isdigit() else None
+            name = ENEMY_NAMES[enemy.enemy_type] if enemy is not None else "An enemy"
+            attacks = {
+                "heavy_blow": "heavy blow", "slash": "slash",
+                "contact": "defense-line contact", "needle_attack": "needle attack",
+                "scheduled_attack": "attack", "close_attack": "close-range attack",
+                "retaliation": "retaliation",
+            }
+            return f"{name}'s {attacks.get(action, 'attack')} dealt the final damage."
+        if source == "direct":
+            return "Direct damage depleted your HP."
+        return f"{source.replace('_', ' ').capitalize()} damage depleted your HP."
 
     def _end_run(self, reason: GameOverReason) -> None:
         self._pending_action = None
         self._spell_remaining = 0.0
         self.game_over_reason = reason
+        if reason is GameOverReason.HP_DEPLETED and self.death_cause is None:
+            self.death_cause = "Your HP reached zero."
         self.transition_to(GameState.GAME_OVER)
+
+    def _save_completed_campaign(self) -> None:
+        """Persist once, after the turn resolver has authorized final Victory."""
+        if self._campaign_save_attempted:
+            return
+        self._campaign_save_attempted = True
+        if self.high_score_store is not None:
+            self.high_scores = self.high_score_store.save_completed_campaign(
+                self.score.snapshot().total, self.stage,
+            )
 
     def check_stage_end(self) -> bool:
         """A stage clears only after the final action and all required defeats."""
@@ -621,32 +635,36 @@ class World:
         if self.check_stage_end():
             self.score.finalize_stage(self.hp, self.max_hp, self.mp, self.max_mp)
             self._cleared_stage = self.stage
-            self.transition_to(GameState.VICTORY if self.encounter.definition.final
-                               else GameState.STAGE_CLEAR)
+            target = (GameState.VICTORY if self.encounter.definition.final
+                      else GameState.STAGE_CLEAR)
+            if self.transition_to(target) and target is GameState.VICTORY:
+                self._save_completed_campaign()
             return True
         initial_statuses = self.statuses.snapshot()
-        initial_hazards = self.hazards.snapshot()
         context = EnemyTurnContext(
             turn_index=self.turn_index,
             damage_player=lambda amount: self.apply_player_damage(amount, source="enemy_contact"),
             attack_player=lambda amount: self.apply_player_damage(amount, source="boss_attack"),
             player_defeated=lambda: self.hp <= 0 or self.state is GameState.GAME_OVER,
-            force_knockout=lambda: self.force_player_knockout(source="odin_execute"),
             player_row=self.player_row,
             ability_player=lambda amount: self.apply_player_damage(amount, source="enemy_ability"),
+            damage_from_enemy=lambda enemy_id, amount, action: self.apply_player_damage(
+                amount, source=f"enemy:{enemy_id}:{action}"),
             apply_status=lambda kind, duration, source: self.apply_status(
                 kind, duration, source_id=source),
-            place_poison_tile=lambda row, duration, source: self.place_poison_tile(
-                row, duration, source_id=source),
         )
         resolve_enemy_phase(self.enemies.values(), context)
-        process_status_phase(self, initial_statuses, initial_hazards)
+        process_status_phase(self, initial_statuses)
         self.last_resolved_turn = self.turn_index
         if self.hp <= 0 or self.state is GameState.GAME_OVER:
             if self.state is not GameState.GAME_OVER:
                 self._end_run(GameOverReason.HP_DEPLETED)
         elif (self.encounter is not None
               and self.encounter.outcome(self.combat) is EncounterOutcome.FAILED):
+            escaped = next((self.enemies[enemy_id] for enemy_id in self.encounter.definition.mandatory_ids
+                            if enemy_id in self.enemies and self.enemies[enemy_id].escaped), None)
+            self.death_cause = (f"{ENEMY_NAMES[escaped.enemy_type]} breached the defense line."
+                                if escaped is not None else "A required enemy escaped.")
             self._end_run(GameOverReason.DEFENSE_FAILED)
         else:
             self.turn_index += 1
@@ -666,6 +684,7 @@ class World:
             instructions_page=self.instructions_page,
             combat_observations=self.combat.observations,
             score=self.score.snapshot(),
+            high_scores=self.high_scores,
             stage=self.stage,
             turn_index=self.turn_index,
             hp=self.hp,
@@ -688,11 +707,10 @@ class World:
             pending_bp=self.pending_bp,
             last_resolved_turn=self.last_resolved_turn,
             game_over_reason=self.game_over_reason,
+            death_cause=self.death_cause,
             spawned_waves=len(self.encounter.spawned_waves) if self.encounter else 0,
             total_waves=len(self.encounter.definition.waves) if self.encounter else 0,
             statuses=self.statuses.snapshot(),
-            reraise_used=self.reraise_used,
-            hazards=self.hazards.snapshot(),
             status_events=self.status_events,
             selected_spell=self.selected_spell,
             spell_hud=hud,

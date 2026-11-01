@@ -34,13 +34,13 @@ class BatchDamageTests(unittest.TestCase):
         def observe():
             self.assertEqual([combat.enemies[i].hp for i in (1, 2, 3)], [0, 5, 0])
             self.assertEqual([(e.enemy_id, e.source) for e in combat.pending_deaths],
-                             [(1, 'spell:starstorm'), (3, 'spell:starstorm')])
+                             [(1, 'spell:skyfall'), (3, 'spell:skyfall')])
             drain()
         with patch.object(combat, 'resolve_deaths', side_effect=observe) as resolver:
-            result = combat.apply_damage_batch((3, 2, 1), 10, 'spell:starstorm')
+            result = combat.apply_damage_batch((3, 2, 1), 10, 'spell:skyfall')
             resolver.assert_called_once_with()
         self.assertEqual([(e.enemy_id, e.source) for e in result.deaths],
-                         [(1, 'spell:starstorm'), (3, 'spell:starstorm'), (2, 'explosion')])
+                         [(1, 'spell:skyfall'), (3, 'spell:skyfall'), (2, 'explosion')])
         self.assertEqual([(c.enemy_id, c.direct_damage, c.explosion_damage)
                           for c in result.changes], [(1, 10, 0), (2, 10, 5), (3, 10, 0)])
         self.assertFalse(combat.pending_deaths)
@@ -52,15 +52,15 @@ class BatchDamageTests(unittest.TestCase):
             10: enemy(10, 6, 4, kind=EnemyType.BOMB, hp=10),
             1: enemy(1, 4, 3, hp=5),
         })
-        result = combat.apply_damage_batch((10, 8, 5), 10, 'spell:starstorm')
+        result = combat.apply_damage_batch((10, 8, 5), 10, 'spell:skyfall')
         self.assertEqual([(e.enemy_id, e.source) for e in result.deaths],
-                         [(5, 'spell:starstorm'), (8, 'spell:starstorm'),
-                          (10, 'spell:starstorm'), (1, 'explosion')])
+                         [(5, 'spell:skyfall'), (8, 'spell:skyfall'),
+                          (10, 'spell:skyfall'), (1, 'explosion')])
 
     def test_nonlethal_explosion_damage_is_included_in_detached_result(self):
         combat = Combat(enemies={1: enemy(1, 5, 3, kind=EnemyType.BOMB, hp=10),
                                  2: enemy(2, 4, 3)})
-        result = combat.apply_damage_batch((1,), 20, 'spell:fire')
+        result = combat.apply_damage_batch((1,), 20, 'spell:ember_lance')
         change = next(c for c in result.changes if c.enemy_id == 2)
         self.assertEqual((change.hp_before, change.hp_after, change.direct_damage,
                           change.explosion_damage), (50, 40, 0, 10))
@@ -89,9 +89,9 @@ class BatchDamageTests(unittest.TestCase):
 
     def test_hp_clamps_and_repeated_lethal_batches_do_not_repeat_deaths(self):
         combat = Combat(enemies={1: enemy(1, 5, 3, hp=5)})
-        first = combat.apply_damage_batch((1,), 20, 'spell:fire')
+        first = combat.apply_damage_batch((1,), 20, 'spell:ember_lance')
         before = deepcopy(combat)
-        repeated = combat.apply_damage_batch((1,), 20, 'spell:fire')
+        repeated = combat.apply_damage_batch((1,), 20, 'spell:ember_lance')
         self.assertEqual(combat.enemies[1].hp, 0)
         self.assertEqual(first.changes[0].direct_damage, 5)
         self.assertEqual(len(first.deaths), 1)
@@ -102,7 +102,7 @@ class BatchDamageTests(unittest.TestCase):
         combat = Combat(enemies={1: enemy(1, 5, 3, hp=5), 9: enemy(9, 0, 0, hp=5)})
         combat.apply_damage(9, 5, 'projectile')
         old = combat.death_events[0]
-        result = combat.apply_damage_batch((9, 1), 20, 'spell:fire')
+        result = combat.apply_damage_batch((9, 1), 20, 'spell:ember_lance')
         self.assertEqual([e.enemy_id for e in result.deaths], [1])
         self.assertIs(combat.death_events[0], old)
         self.assertEqual(set(combat.enemies), {1, 9})
@@ -136,7 +136,7 @@ class BatchDamageTests(unittest.TestCase):
                       4: enemy(4, 4, 3),
                       5: enemy(5, 4, 4, kind=EnemyType.BOMB, hp=10)}
             combat = Combat(enemies={i: values[i] for i in order})
-            result = combat.apply_damage_batch(targets, 10, 'spell:starstorm')
+            result = combat.apply_damage_batch(targets, 10, 'spell:skyfall')
             results.append(result)
         self.assertEqual(results[0], results[1])
         self.assertEqual(results[0], results[2])

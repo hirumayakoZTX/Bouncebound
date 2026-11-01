@@ -1,9 +1,4 @@
-"""Immutable status records and deterministic enemy-phase timing.
-
-Poison, Bind and Doom skip aging on their application turn. Ward/Levitation age
-only after a full enemy phase they covered; newly granted mid-phase records are
-not aged at that boundary. World owns damage and knockout resource changes.
-"""
+"""Immutable Poison and Ward records with deterministic enemy-phase timing."""
 
 from dataclasses import dataclass, field, replace
 from enum import Enum
@@ -11,16 +6,11 @@ from enum import Enum
 
 class StatusKind(Enum):
     POISON = "poison"
-    BIND = "bind"
-    DOOM = "doom"
-    LEVITATION = "levitation"
     WARD = "ward"
-    RERAISE = "reraise"
 
 
-BENEFICIAL_KINDS = frozenset({StatusKind.LEVITATION, StatusKind.WARD, StatusKind.RERAISE})
-ESUNA_REMOVABLE = frozenset({StatusKind.POISON, StatusKind.BIND})
-RERAISE_HP = 50
+BENEFICIAL_KINDS = frozenset({StatusKind.WARD})
+CLEANSE_REMOVABLE = frozenset({StatusKind.POISON})
 POISON_DAMAGE = 3
 
 
@@ -45,16 +35,7 @@ class StatusEventKind(Enum):
     DURATION_ADVANCED = "duration_advanced"
     DAMAGE = "damage_applied"
     POISON_DAMAGE = "periodic_damage_applied"
-    HAZARD_DAMAGE = "hazard_damage_applied"
     WARD_BLOCKED = "damage_blocked_by_ward"
-    LEVITATION_BLOCKED = "hazard_blocked_by_levitation"
-    DOOM_ADVANCED = "doom_countdown_advanced"
-    FORCED_KNOCKOUT = "forced_knockout"
-    RERAISE_ACTIVATED = "reraise_activated"
-    HAZARD_PLACED = "hazard_placed"
-    HAZARD_REFRESHED = "hazard_refreshed"
-    HAZARD_REMOVED = "hazard_removed"
-    HAZARD_EXPIRED = "hazard_expired"
 
 
 @dataclass(frozen=True)
@@ -87,15 +68,13 @@ class StatusEffect:
             raise ValueError("Remaining effective turns must be positive or unspecified")
         validate_turn(self.applied_turn)
         validate_source(self.source_id)
-        if self.kind in (StatusKind.WARD, StatusKind.RERAISE):
+        if self.kind is StatusKind.WARD:
             if type(self.charges) is not int or self.charges != 1:
-                raise ValueError("Active Ward and Reraise records require exactly one charge")
+                raise ValueError("Active Ward records require exactly one charge")
+            if self.remaining_turns is None:
+                raise ValueError("Ward requires an effective duration")
         elif self.charges is not None:
-            raise ValueError("Only Ward and Reraise use charges")
-        if self.kind is StatusKind.RERAISE and self.remaining_turns is not None:
-            raise ValueError("Reraise persists until consumed, without a turn duration")
-        if self.kind in (StatusKind.WARD, StatusKind.LEVITATION) and self.remaining_turns is None:
-            raise ValueError("Ward and Levitation require an effective duration")
+            raise ValueError("Only Ward uses charges")
 
     @property
     def beneficial(self) -> bool:
@@ -104,11 +83,6 @@ class StatusEffect:
     @property
     def negative(self) -> bool:
         return not self.beneficial
-
-    @property
-    def revival_hp(self) -> int | None:
-        return RERAISE_HP if self.kind is StatusKind.RERAISE else None
-
 
 @dataclass
 class StatusState:
@@ -119,7 +93,6 @@ class StatusState:
     _phase_turn: int = field(default=0, init=False)
     _expired_turn: int = field(default=0, init=False)
     _poison_turn: int = field(default=0, init=False)
-    _doom_turn: int = field(default=0, init=False)
 
     @property
     def events(self) -> tuple[StatusEvent, ...]:
@@ -182,24 +155,6 @@ class StatusState:
                     and turn > initial.applied_turn))
         return effect if eligible else None
 
-    def advance_doom(self, turn: int) -> bool:
-        """Advance once and remove consumed Doom before reporting its knockout."""
-        validate_turn(turn)
-        if turn <= self._doom_turn:
-            return False
-        self._doom_turn = turn
-        effect = self.get(StatusKind.DOOM)
-        if effect is None or effect.remaining_turns is None or turn <= effect.applied_turn:
-            return False
-        remaining = effect.remaining_turns - 1
-        self.record(StatusEvent(StatusEventKind.DOOM_ADVANCED, turn, StatusKind.DOOM,
-                                source_id=effect.source_id, remaining_turns=remaining))
-        if remaining == 0:
-            self.remove(StatusKind.DOOM, turn=turn, expired=True)
-            return True
-        self._effects[StatusKind.DOOM] = replace(effect, remaining_turns=remaining)
-        return False
-
     def finish_phase(self, turn: int, initial: tuple[StatusEffect, ...]) -> tuple[StatusEvent, ...]:
         """Age covered intervals after damage; do not age refreshed mid-phase records."""
         validate_turn(turn)
@@ -209,9 +164,9 @@ class StatusState:
         index = len(self._events)
         for effect in sorted(initial, key=lambda item: item.kind.value):
             if (self.get(effect.kind) is not effect or effect.remaining_turns is None
-                    or effect.kind is StatusKind.DOOM or turn < effect.applied_turn):
+                    or turn < effect.applied_turn):
                 continue
-            if effect.kind not in (StatusKind.WARD, StatusKind.LEVITATION) and turn == effect.applied_turn:
+            if effect.kind is StatusKind.POISON and turn == effect.applied_turn:
                 continue
             remaining = effect.remaining_turns - 1
             if remaining == 0:
@@ -225,4 +180,4 @@ class StatusState:
     def reset(self) -> None:
         self._effects.clear()
         self._events.clear()
-        self._phase_turn = self._expired_turn = self._poison_turn = self._doom_turn = 0
+        self._phase_turn = self._expired_turn = self._poison_turn = 0

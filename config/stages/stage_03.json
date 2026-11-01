@@ -14,25 +14,25 @@
         },
         {
           "id": 402,
-          "kind": "mandragora",
+          "kind": "rootling",
           "col": 6,
           "row": 2
         },
         {
           "id": 403,
-          "kind": "diremite",
+          "kind": "venomcrawler",
           "col": 5,
           "row": 3
         },
         {
           "id": 404,
-          "kind": "tonberry",
+          "kind": "hooded_stalker",
           "col": 5,
           "row": 4
         },
         {
           "id": 405,
-          "kind": "gorgon",
+          "kind": "thorn_sentinel",
           "col": 6,
           "row": 3
         },
@@ -55,25 +55,25 @@
         },
         {
           "id": 408,
-          "kind": "mandragora",
+          "kind": "rootling",
           "col": 6,
           "row": 1
         },
         {
           "id": 409,
-          "kind": "diremite",
+          "kind": "venomcrawler",
           "col": 5,
           "row": 2
         },
         {
           "id": 410,
-          "kind": "tonberry",
+          "kind": "hooded_stalker",
           "col": 5,
           "row": 3
         },
         {
           "id": 411,
-          "kind": "gorgon",
+          "kind": "thorn_sentinel",
           "col": 6,
           "row": 2
         },
@@ -96,25 +96,25 @@
         },
         {
           "id": 414,
-          "kind": "mandragora",
+          "kind": "rootling",
           "col": 6,
           "row": 3
         },
         {
           "id": 415,
-          "kind": "diremite",
+          "kind": "venomcrawler",
           "col": 5,
           "row": 4
         },
         {
           "id": 416,
-          "kind": "tonberry",
+          "kind": "hooded_stalker",
           "col": 5,
           "row": 5
         },
         {
           "id": 417,
-          "kind": "gorgon",
+          "kind": "thorn_sentinel",
           "col": 6,
           "row": 4
         },
@@ -143,25 +143,25 @@
         },
         {
           "id": 421,
-          "kind": "mandragora",
+          "kind": "rootling",
           "col": 6,
           "row": 0
         },
         {
           "id": 422,
-          "kind": "diremite",
+          "kind": "venomcrawler",
           "col": 5,
           "row": 1
         },
         {
           "id": 423,
-          "kind": "tonberry",
+          "kind": "hooded_stalker",
           "col": 5,
           "row": 2
         },
         {
           "id": 424,
-          "kind": "gorgon",
+          "kind": "thorn_sentinel",
           "col": 4,
           "row": 1
         },
@@ -190,25 +190,25 @@
         },
         {
           "id": 428,
-          "kind": "mandragora",
+          "kind": "rootling",
           "col": 6,
           "row": 4
         },
         {
           "id": 429,
-          "kind": "diremite",
+          "kind": "venomcrawler",
           "col": 5,
           "row": 5
         },
         {
           "id": 430,
-          "kind": "tonberry",
+          "kind": "hooded_stalker",
           "col": 5,
           "row": 6
         },
         {
           "id": 431,
-          "kind": "gorgon",
+          "kind": "thorn_sentinel",
           "col": 4,
           "row": 5
         },
@@ -237,25 +237,25 @@
         },
         {
           "id": 435,
-          "kind": "mandragora",
+          "kind": "rootling",
           "col": 6,
           "row": 1
         },
         {
           "id": 436,
-          "kind": "diremite",
+          "kind": "venomcrawler",
           "col": 5,
           "row": 2
         },
         {
           "id": 437,
-          "kind": "tonberry",
+          "kind": "hooded_stalker",
           "col": 5,
           "row": 3
         },
         {
           "id": 438,
-          "kind": "gorgon",
+          "kind": "thorn_sentinel",
           "col": 4,
           "row": 2
         },
@@ -284,25 +284,25 @@
         },
         {
           "id": 442,
-          "kind": "mandragora",
+          "kind": "rootling",
           "col": 6,
           "row": 2
         },
         {
           "id": 443,
-          "kind": "diremite",
+          "kind": "venomcrawler",
           "col": 5,
           "row": 3
         },
         {
           "id": 444,
-          "kind": "tonberry",
+          "kind": "hooded_stalker",
           "col": 5,
           "row": 4
         },
         {
           "id": 445,
-          "kind": "gorgon",
+          "kind": "thorn_sentinel",
           "col": 4,
           "row": 3
         },
@@ -321,7 +321,7 @@
     "spawns": [
       {
         "id": 500,
-        "kind": "odin",
+        "kind": "iron_regent",
         "col": 5,
         "row": 3
       }

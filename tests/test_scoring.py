@@ -49,12 +49,12 @@ class ScoringTests(unittest.TestCase):
 
     def test_fire_bomb_chain_scores_real_death_causes_once(self):
         world = start(encounter((1, 'bomb', 6, 3), (2, 'bomb', 5, 3), (3, 'basic', 5, 4)))
-        self.assertTrue(world.select_spell('fire'))
+        self.assertTrue(world.select_spell('ember_lance'))
         self.assertTrue(world.cast_selected_spell().valid)
         snap = world.snapshot().score
         self.assertEqual(snap.breakdown, ScoreBreakdown(500, 100, 0, 0))
         self.assertEqual([(e.enemy_id, e.source) for e in world.combat.death_events],
-                         [(1, 'spell:fire'), (2, 'explosion'), (3, 'explosion')])
+                         [(1, 'spell:ember_lance'), (2, 'explosion'), (3, 'explosion')])
         world._sync_score_deaths()
         self.assertEqual(world.snapshot().score, snap)
         world.advance_time(.45)
@@ -64,21 +64,19 @@ class ScoringTests(unittest.TestCase):
         self.assertFalse(world.resolve_turn())
         self.assertEqual(world.snapshot().score.total, 22100)
 
-    def test_starstorm_and_meteor_score_actual_multi_kills(self):
-        for spell, stage in (('starstorm', 1), ('meteor', 3)):
-            with self.subTest(spell=spell):
-                world = World(demo=False)
-                world.start_new_run(); world.transition_to(GameState.PLAYER_AIM)
-                world.stage = stage
-                for i, col in enumerate((6, 7, 8), 1):
-                    world.combat.add_enemy(Enemy(i, EnemyType.BASIC, col, 3))
-                self.assertTrue(world.select_spell(spell))
-                self.assertTrue(world.cast_selected_spell().valid)
-                self.assertEqual(world.snapshot().score.breakdown.defeats, 300)
-                self.assertEqual(world.snapshot().score.breakdown.combos, 0)
-                world.advance_time(.45)
-                self.assertTrue(world.resolve_turn())
-                self.assertEqual(world.snapshot().score.breakdown.defeats, 300)
+    def test_skyfall_scores_actual_stage_three_multi_kills(self):
+        world = World(demo=False)
+        world.start_new_run(); world.transition_to(GameState.PLAYER_AIM)
+        world.stage = 3
+        for i, col in enumerate((6, 7, 8), 1):
+            world.combat.add_enemy(Enemy(i, EnemyType.BASIC, col, 3))
+        self.assertTrue(world.select_spell('skyfall'))
+        self.assertTrue(world.cast_selected_spell().valid)
+        self.assertEqual(world.snapshot().score.breakdown.defeats, 300)
+        self.assertEqual(world.snapshot().score.breakdown.combos, 0)
+        world.advance_time(.45)
+        self.assertTrue(world.resolve_turn())
+        self.assertEqual(world.snapshot().score.breakdown.defeats, 300)
 
     def test_two_orbs_hit_one_enemy_without_duplicate_death_points(self):
         world = World(demo=False)
@@ -148,9 +146,9 @@ class ScoringTests(unittest.TestCase):
     def test_healing_does_not_restore_no_damage_eligibility(self):
         world = start(encounter((1, 'basic', 7, 3)))
         self.assertEqual(world.apply_player_damage(5), 5)
-        perform_action(world, 'cure', 3)
+        perform_action(world, 'mend', 3)
         self.assertEqual(world.hp, 100)
-        perform_action(world, 'fire', 3)
+        perform_action(world, 'ember_lance', 3)
         self.assertEqual(world.snapshot().score.breakdown, ScoreBreakdown(100, 0, 0, 1500))
 
     def test_ward_block_does_not_count_as_damage(self):
@@ -170,7 +168,7 @@ class ScoringTests(unittest.TestCase):
         world = playing(definition((1, 'bomb', 4, 3), (2, 'basic', 0, 0), boss=(100, 7, 3)))
         accepted = world.snapshot().score.total
         self.assertGreater(accepted, 0)
-        self.assertTrue(world.execute_offensive_spell('test-fire', 'fire').valid)
+        self.assertTrue(world.execute_offensive_spell('test-fire', 'ember_lance').valid)
         self.assertEqual(world.snapshot().score.total, accepted + 200)
         world.apply_player_damage(100)
         self.assertIs(world.state, GameState.GAME_OVER)
@@ -178,7 +176,7 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(world.snapshot().score.total, accepted)
         self.assertEqual(world.snapshot().score.attempt_total, 0)
         world.transition_to(GameState.PLAYER_AIM)
-        self.assertTrue(world.execute_offensive_spell('test-fire', 'fire').valid)
+        self.assertTrue(world.execute_offensive_spell('test-fire', 'ember_lance').valid)
         self.assertEqual(world.snapshot().score.total, accepted + 200)
         world.apply_player_damage(100)
         self.assertTrue(world.restart())
@@ -206,74 +204,7 @@ class ScoringTests(unittest.TestCase):
             if reference is None: reference = score
             self.assertEqual(score, reference)
 
-    def test_full_campaign_with_offensive_spells_and_defensive_spells(self):
-        world = World(); world.start_new_run(); world.transition_to(GameState.PLAYER_AIM)
-        for row in OPENING_ROWS: perform_action(world, 'shot', row)
-        for kind, row in (('fire', 2), ('starstorm', 5), ('shot', 5)):
-            perform_action(world, kind, row)
-        self.assertIs(world.state, GameState.STAGE_CLEAR)
-        self.assertTrue(world.advance_stage()); world.transition_to(GameState.PLAYER_AIM)
-        for row in STAGE_TWO_ROWS: perform_action(world, 'shot', row)
-        self.assertIs(world.state, GameState.STAGE_CLEAR)
-        self.assertTrue(world.advance_stage()); world.transition_to(GameState.PLAYER_AIM)
-        for row in STAGE_THREE_ROWS: perform_action(world, 'shot', row)
-        for kind in ('ward', 'reraise', 'shot'): perform_action(world, kind, 3)
-        self.assertIs(world.state, GameState.VICTORY)
-        self.assertTrue(world.transition_to(GameState.RESULTS))
-        score = world.snapshot().score
-        self.assertEqual(score.breakdown, ScoreBreakdown(21300, 1850, 1600, 3000))
-        self.assertEqual(score.total, 27750)
-        self.assertEqual(sum(event.points for event in score.events), score.total)
-        self.assertTrue(any(event.kind == 'bomb_chain_kill' for event in score.events))
-        self.assertTrue(any(event.kind == 'shooting_combo' for event in score.events))
 
-    def test_real_campaign_failure_retry_victory_and_full_restart_with_input(self):
-        import pygame
-        from src.game import Game
-
-        pygame.display.init(); pygame.display.set_mode((960, 576))
-        self.addCleanup(pygame.quit)
-        pygame.event.clear()
-        game = Game(effects_enabled=False); game.running = True
-        world = game.world
-
-        def key(value):
-            pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=value))
-            for event in pygame.event.get(): game.handle_event(event)
-
-        def finish_campaign_from_stage_two():
-            for row in STAGE_TWO_ROWS: perform_action(world, 'shot', row, game=game)
-            self.assertIs(world.state, GameState.STAGE_CLEAR)
-            key(pygame.K_RETURN); key(pygame.K_RETURN)
-            for row in STAGE_THREE_ROWS: perform_action(world, 'shot', row, game=game)
-            for kind in ('ward', 'reraise', 'shot'): perform_action(world, kind, 3, game=game)
-            self.assertIs(world.state, GameState.VICTORY)
-            key(pygame.K_RETURN)
-            self.assertIs(world.state, GameState.RESULTS)
-            self.assertEqual(world.snapshot().score.total, 30750)
-
-        key(pygame.K_RETURN); key(pygame.K_RETURN)
-        for row in STAGE_ONE_ROWS: perform_action(world, 'shot', row, game=game)
-        self.assertEqual(world.snapshot().score.total, 9950)
-        key(pygame.K_RETURN); key(pygame.K_RETURN)
-        for row in STAGE_TWO_ROWS[:3]: perform_action(world, 'shot', row, game=game)
-        for _ in range(30):
-            if world.state is not GameState.PLAYER_AIM: break
-            perform_action(world, 'shot', 7, game=game)
-        self.assertIs(world.state, GameState.GAME_OVER)
-        self.assertEqual(world.snapshot().score.attempt_total, 6250)
-        key(pygame.K_t)
-        self.assertEqual((world.stage, world.state, world.snapshot().score.total),
-                         (2, GameState.STAGE_INTRO, 9950))
-        key(pygame.K_RETURN)
-        finish_campaign_from_stage_two()
-        key(pygame.K_r)
-        self.assertEqual((world.stage, world.state, world.snapshot().score.total),
-                         (1, GameState.STAGE_INTRO, 0))
-        key(pygame.K_RETURN)
-        for row in STAGE_ONE_ROWS: perform_action(world, 'shot', row, game=game)
-        key(pygame.K_RETURN); key(pygame.K_RETURN)
-        finish_campaign_from_stage_two()
 
 
 if __name__ == '__main__':

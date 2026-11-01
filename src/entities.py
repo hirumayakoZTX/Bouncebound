@@ -38,45 +38,54 @@ class EnemyTurnContext:
     attack_player: Callable[[int], int] | None = None
     player_row: int | None = None
     apply_status: Callable[[StatusKind, int, int], object] | None = None
-    place_poison_tile: Callable[[int, int, int], object] | None = None
     cell_is_free: Callable[[int, int], bool] | None = None
     ability_player: Callable[[int], int] | None = None
-    force_knockout: Callable[[], int] | None = None
+    damage_from_enemy: Callable[[int, int, str], int] | None = None
 
 
 class EnemyType(Enum):
     BASIC = "basic"
     BOMB = "bomb"
-    ULTROS = "ultros"
-    TYPHON = "typhon"
-    CACTUAR = "cactuar"
-    ALLIGATOR = "alligator"
-    BULB = "bulb"
-    MORBOL = "morbol"
-    LANDTRAP = "landtrap"
-    CHICHU = "chichu"
-    MANDRAGORA = "mandragora"
-    DIREMITE = "diremite"
-    TONBERRY = "tonberry"
-    GORGON = "gorgon"
-    ODIN = "odin"
+    INKMAW = "inkmaw"
+    GALEJAW = "galejaw"
+    NEEDLELING = "needleling"
+    MARSHMAW = "marshmaw"
+    SPOREBUD = "sporebud"
+    MAWROOT = "mawroot"
+    SNAPROOT = "snaproot"
+    BRIARHEART = "briarheart"
+    ROOTLING = "rootling"
+    VENOMCRAWLER = "venomcrawler"
+    HOODED_STALKER = "hooded_stalker"
+    THORN_SENTINEL = "thorn_sentinel"
+    IRON_REGENT = "iron_regent"
 
 
-STAGE_ONE_BOSSES = frozenset({EnemyType.ULTROS, EnemyType.TYPHON})
+STAGE_ONE_BOSSES = frozenset({EnemyType.INKMAW, EnemyType.GALEJAW})
 BOSS_HP = 15
 BOSS_ATTACK_DAMAGE = 5
-LIVE_BOSSES = STAGE_ONE_BOSSES | {EnemyType.CHICHU, EnemyType.ODIN}
-STAGE_THREE_ENEMIES = frozenset({EnemyType.MANDRAGORA, EnemyType.DIREMITE,
-                                EnemyType.TONBERRY, EnemyType.GORGON, EnemyType.ODIN})
+LIVE_BOSSES = STAGE_ONE_BOSSES | {EnemyType.BRIARHEART, EnemyType.IRON_REGENT}
+STAGE_THREE_ENEMIES = frozenset({EnemyType.ROOTLING, EnemyType.VENOMCRAWLER,
+                                EnemyType.HOODED_STALKER, EnemyType.THORN_SENTINEL, EnemyType.IRON_REGENT})
 # HP and active-attack damage. All types retain five-HP defense-line contact.
 ENEMY_STATS = MappingProxyType({
     EnemyType.BASIC: (5, 0), EnemyType.BOMB: (10, 0),
-    EnemyType.ULTROS: (15, 5), EnemyType.TYPHON: (15, 5),
-    EnemyType.CACTUAR: (10, 5), EnemyType.ALLIGATOR: (12, 4),
-    EnemyType.BULB: (8, 0), EnemyType.MORBOL: (18, 0),
-    EnemyType.LANDTRAP: (8, 0), EnemyType.CHICHU: (30, 15),
-    EnemyType.MANDRAGORA: (10, 0), EnemyType.DIREMITE: (12, 0),
-    EnemyType.TONBERRY: (18, 3), EnemyType.GORGON: (15, 0), EnemyType.ODIN: (50, 40),
+    EnemyType.INKMAW: (15, 5), EnemyType.GALEJAW: (15, 5),
+    EnemyType.NEEDLELING: (10, 5), EnemyType.MARSHMAW: (12, 4),
+    EnemyType.SPOREBUD: (8, 0), EnemyType.MAWROOT: (18, 0),
+    EnemyType.SNAPROOT: (8, 0), EnemyType.BRIARHEART: (30, 15),
+    EnemyType.ROOTLING: (10, 0), EnemyType.VENOMCRAWLER: (12, 0),
+    EnemyType.HOODED_STALKER: (18, 3), EnemyType.THORN_SENTINEL: (15, 0), EnemyType.IRON_REGENT: (50, 40),
+})
+ENEMY_NAMES = MappingProxyType({
+    EnemyType.BASIC: "Slime", EnemyType.BOMB: "Bomb",
+    EnemyType.INKMAW: "Octopus", EnemyType.GALEJAW: "Hurricane",
+    EnemyType.NEEDLELING: "Cactus", EnemyType.MARSHMAW: "Alligator",
+    EnemyType.SPOREBUD: "Bulb", EnemyType.MAWROOT: "Bigmouth Flower",
+    EnemyType.SNAPROOT: "Snap Plant", EnemyType.BRIARHEART: "Seedling",
+    EnemyType.ROOTLING: "Root Plant", EnemyType.VENOMCRAWLER: "Mite",
+    EnemyType.HOODED_STALKER: "Greenberry", EnemyType.THORN_SENTINEL: "Thorn Snake",
+    EnemyType.IRON_REGENT: "Iron Knight",
 })
 ENEMY_UNLOCK_STAGE = MappingProxyType({
     kind: 3 if kind in STAGE_THREE_ENEMIES else
@@ -95,7 +104,7 @@ class EnemySnapshot:
     max_hp: int
     bounds: Bounds
     enraged: bool = False
-    odin_phase: int | None = None
+    boss_phase: int | None = None
 
 
 @dataclass
@@ -113,7 +122,7 @@ class Enemy:
     escaped: bool = field(default=False, init=False)
     escape_turn: int | None = field(default=None, init=False)
     enraged: bool = field(default=False, init=False)
-    odin_phase: int = field(default=0, init=False)
+    boss_phase: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
         validate_id(self.enemy_id)
@@ -155,7 +164,7 @@ class Enemy:
             return False
         before = self.hp
         self.hp = max(0, self.hp - amount)
-        if self.enemy_type is EnemyType.TONBERRY and self.hp < before:
+        if self.enemy_type is EnemyType.HOODED_STALKER and self.hp < before:
             self.enraged = True
         return not self.alive
 
@@ -166,8 +175,10 @@ class Enemy:
         self.last_action_turn = context.turn_index
         self.turns_alive += 1
         if self.enemy_type in STAGE_ONE_BOSSES:
-            damage = context.attack_player or context.damage_player
-            damage(self.attack_damage)
+            if context.damage_from_enemy is not None:
+                context.damage_from_enemy(self.enemy_id, self.attack_damage, "attack")
+            else:
+                (context.attack_player or context.damage_player)(self.attack_damage)
         else:
             from src.enemy_abilities import execute_ability
             execute_ability(self, context)
@@ -190,7 +201,7 @@ class Enemy:
     def snapshot(self) -> EnemySnapshot:
         return EnemySnapshot(self.enemy_id, self.enemy_type, self.grid_col, self.grid_row,
                              self.hp, self.max_hp, self.bounds, self.enraged,
-                             self.odin_phase if self.enemy_type is EnemyType.ODIN else None)
+                             self.boss_phase if self.enemy_type is EnemyType.IRON_REGENT else None)
 
 
 @dataclass(frozen=True)

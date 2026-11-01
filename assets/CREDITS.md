@@ -1,9 +1,9 @@
 # Asset credits
 
 The five pixel placeholders below were created for Bouncebound from local,
-AI-assisted pixel-map designs. They are original project placeholders, not sprites
-extracted from FFXIV or copied from external artwork. No third-party image,
-audio, or font file was downloaded or added for this set.
+AI-assisted pixel-map designs. They are original project assets, not extracted
+or traced from third-party game art. No third-party image, audio, or font file
+was downloaded or added for this set.
 
 | Asset title | Category / file | Creator | External source URL | License | Modifications | Attribution requirements |
 |---|---|---|---|---|---|---|
@@ -31,10 +31,9 @@ to reuse. This table does not grant rights to third-party replacement files.
 
 These 13 additional sprites are original AI-assisted pixel-map designs created
 for Bouncebound. They use simplified creature silhouettes, the existing dark
-outline, and a shared limited palette. No FFXIV client assets, traced sprites,
+outline, and a shared limited palette. No client assets, traced sprites,
 external image references, downloaded artwork, or external fonts were used.
-The gameplay names identify the actors; these drawings are original project
-interpretations rather than reproductions of their FFXIV appearance.
+Every silhouette and pixel map is an original project design.
 
 For every entry below: creator is **Bouncebound project (AI-assisted pixel-map
 design)**; external source URL is **not applicable (original project asset)**;
@@ -44,19 +43,19 @@ attribution requirements are **GPL v3 redistribution conditions, no extra terms*
 
 | Asset title | Category | File |
 |---|---|---|
-| Violet Tide — Ultros | Stage 1 boss | `images/enemies/ultros.png` |
-| Gale Puffer — Typhon | Stage 1 boss | `images/enemies/typhon.png` |
-| Forked Cactus — Cactuar | Stage 2 enemy | `images/enemies/cactuar.png` |
-| Mossjaw — Alligator | Stage 2 enemy | `images/enemies/alligator.png` |
-| Dusk Blossom — Bulb | Stage 2 enemy | `images/enemies/bulb.png` |
-| Toothgarden — Morbol | Stage 2 enemy | `images/enemies/morbol.png` |
-| Ember Trap — Landtrap | Stage 2 enemy | `images/enemies/landtrap.png` |
-| Sunseed Beast — Chichu | Stage 2 boss | `images/enemies/chichu.png` |
-| Lantern Root — Mandragora | Stage 3 enemy | `images/enemies/mandragora.png` |
-| Glassback Mite — Diremite | Stage 3 enemy | `images/enemies/diremite.png` |
-| Hooded Watcher — Tonberry | Stage 3 enemy | `images/enemies/tonberry.png` |
-| Violet Coil — Gorgon | Stage 3 enemy | `images/enemies/gorgon.png` |
-| Iron Dusk — Odin | Stage 3 boss | `images/enemies/odin.png` |
+| Octopus | Stage 1 boss | `images/enemies/inkmaw.png` |
+| Hurricane | Stage 1 boss | `images/enemies/galejaw.png` |
+| Cactus | Stage 2 enemy | `images/enemies/needleling.png` |
+| Alligator | Stage 2 enemy | `images/enemies/marshmaw.png` |
+| Bulb | Stage 2 enemy | `images/enemies/sporebud.png` |
+| Bigmouth Flower | Stage 2 enemy | `images/enemies/mawroot.png` |
+| Snap Plant | Stage 2 enemy | `images/enemies/snaproot.png` |
+| Seedling | Stage 2 boss | `images/enemies/briarheart.png` |
+| Root Plant | Stage 3 enemy | `images/enemies/rootling.png` |
+| Mite | Stage 3 enemy | `images/enemies/venomcrawler.png` |
+| Greenberry | Stage 3 enemy | `images/enemies/hooded_stalker.png` |
+| Thorn Snake | Stage 3 enemy | `images/enemies/thorn_sentinel.png` |
+| Iron Knight | Stage 3 boss | `images/enemies/iron_regent.png` |
 
 Editable maps and the palette are in [generate_enemies.py](generate_enemies.py).
 Every PNG is 16 × 16 RGBA with binary transparency and no antialiasing. Rebuild

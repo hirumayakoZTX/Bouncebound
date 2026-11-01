@@ -19,7 +19,7 @@ def definition(*spawns, boss=None, capacity=25):
     if boss:
         i, col, row = boss
         data['boss_wave'] = dict(when='after_scripted_waves_cleared',
-                                spawns=[dict(id=i, kind='chichu', col=col, row=row)])
+                                spawns=[dict(id=i, kind='briarheart', col=col, row=row)])
     return parse_stage(data)
 
 
@@ -52,7 +52,7 @@ def enter_stage_two(world, *, game=None, schedule=(.25,)):
     assert world.stage == 2 and world.turn_index == 1
 
 
-# Ordinary click targets that deliberately miss Chichu until its defense-line escape.
+# Ordinary click targets that deliberately miss Seedling until its defense-line escape.
 DEFENSE_AIMS = (
     (0, (240, 72)), (5, (650, 360)), (5, (650, 360)), (0, (740, 72)),
     (1, (740, 96)), (1, (480, 72)), (0, (96, 360)),

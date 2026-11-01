@@ -43,23 +43,10 @@ class OffensiveIntegrationTests(unittest.TestCase):
         self.assertIs(world.state, GameState.TURN_RESOLVE)
         self.assertTrue(world.resolve_turn())
 
-    def test_spell_selection_is_free_and_space_uses_the_shared_cast_pipeline(self):
-        world = self.game.world
-        before = deepcopy(world.combat)
-        for key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5,
-                    pygame.K_6, pygame.K_7, pygame.K_8):
-            self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
-        self.assertEqual(world.combat, before)
-        self.assertEqual((world.mp, world.turn_index), (100, 1))
-        self.assertEqual(dict(world.spells.cooldowns), {})
-        self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE))
-        self.assertIs(world.state, GameState.SPELL_ANIMATION)
-        self.assertEqual((world.mp, world.turn_index), (50, 1))
-        self.assertTrue(world.reraise_used)
 
     def test_rendering_after_damage_and_chains_never_mutates_or_reexecutes_effects(self):
         world = self.game.world
-        result = world.execute_offensive_spell('model-fire', 'fire')
+        result = world.execute_offensive_spell('model-fire', 'ember_lance')
         self.assertEqual(len(result.effects.deaths), 6)
         pygame.display.init()
         pygame.font.init()
@@ -83,7 +70,7 @@ class OffensiveIntegrationTests(unittest.TestCase):
             if paused:
                 world.pause()
             before = deepcopy(vars(world))
-            result = world.execute_offensive_spell('blocked', 'fire')
+            result = world.execute_offensive_spell('blocked', 'ember_lance')
             self.assertIs(result.failure, SpellFailure.INVALID_STATE)
             self.assertIsNone(result.effects)
             self.assertEqual(vars(world), before)
@@ -91,7 +78,7 @@ class OffensiveIntegrationTests(unittest.TestCase):
     def test_spell_cleared_board_accelerates_one_wave_after_the_next_resolved_action(self):
         world = self.game.world
         # This is an explicit model call, not a player-facing casting control.
-        result = world.execute_offensive_spell('model-fire', 'fire')
+        result = world.execute_offensive_spell('model-fire', 'ember_lance')
         self.assertTrue(result.valid)
         self.assertEqual(world.snapshot().enemies, ())
         self.assertEqual(world.encounter.spawned_waves, {0})
@@ -118,7 +105,7 @@ class OffensiveIntegrationTests(unittest.TestCase):
         world = World(encounter=config)
         world.start_new_run()
         world.transition_to(GameState.PLAYER_AIM)
-        result = world.execute_offensive_spell("final-model-hit", "fire")
+        result = world.execute_offensive_spell("final-model-hit", "ember_lance")
         self.assertTrue(result.valid)
         self.assertIs(world.encounter.outcome(world.combat), EncounterOutcome.CLEARED)
         self.assertIs(world.state, GameState.PLAYER_AIM)
@@ -128,7 +115,7 @@ class OffensiveIntegrationTests(unittest.TestCase):
 
     def test_offensive_history_is_cleared_by_stage_clear_restart(self):
         world = self.game.world
-        self.assertTrue(world.execute_offensive_spell('reusable', 'fire').valid)
+        self.assertTrue(world.execute_offensive_spell('reusable', 'ember_lance').valid)
         for row in (3,3,2,2,4,3):
             self.shoot(row)
         self.assertIs(world.state, GameState.STAGE_CLEAR)
@@ -140,7 +127,7 @@ class OffensiveIntegrationTests(unittest.TestCase):
         self.assertFalse(world.spells.cooldowns)
         self.assertFalse(world.combat.death_events)
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        self.assertTrue(world.execute_offensive_spell('reusable', 'fire').valid)
+        self.assertTrue(world.execute_offensive_spell('reusable', 'ember_lance').valid)
         self.assertEqual(len(world.combat.death_events), 6)
         self.assertEqual(world.mp, 70)
 

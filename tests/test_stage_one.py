@@ -42,7 +42,7 @@ class CanonicalStageOneTests(unittest.TestCase):
         self.assertEqual(STAGE_ONE.capacity, 25)
         self.assertEqual(STAGE_ONE.boss_wave.escape_policy, 'contact_and_fail')
         self.assertEqual([(s.entity_id,s.kind,s.col,s.row) for s in STAGE_ONE.boss_wave.spawns],
-                         [(100,'ultros',7,2),(101,'typhon',7,5)])
+                         [(100,'inkmaw',7,2),(101,'galejaw',7,5)])
         self.assertEqual(len(STAGE_ONE.mandatory_ids), 30)
         self.assertTrue({100, 101} <= set(STAGE_ONE.mandatory_ids))
         self.assertEqual(dict(World(encounter=STAGE_ONE).stage_definitions), {1: STAGE_ONE})
@@ -72,7 +72,7 @@ class CanonicalStageOneTests(unittest.TestCase):
 
     def test_spell_clearing_scripted_fixture_waits_for_animation_before_bosses(self):
         world = playing(boss_definition(scripted=True))
-        world.select_spell('fire');world.cast_selected_spell()
+        world.select_spell('ember_lance');world.cast_selected_spell()
         self.assertIs(world.state, GameState.SPELL_ANIMATION)
         self.assertTrue(world.encounter.boss_wave_ready(world.combat))
         self.assertEqual(world.spawn_waves(), ())
@@ -96,7 +96,7 @@ class CanonicalStageOneTests(unittest.TestCase):
 
     def test_both_dead_bosses_do_not_clear_with_an_active_required_enemy(self):
         world = playing(boss_definition(scripted=True))
-        perform_action(world, 'fire', 3)
+        perform_action(world, 'ember_lance', 3)
         # Explicit completion-invariant fixture: restore a required ordinary actor.
         world.enemies[1].hp = 5
         world.combat.apply_damage(100, 15, 'fixture');world.combat.apply_damage(101, 15, 'fixture')
@@ -111,7 +111,7 @@ class CanonicalStageOneTests(unittest.TestCase):
         encounter.spawn_due(1, combat)
         combat.enemies[1].grid_col = 13;combat.enemies[1].escape(1)
         # Archive fixture for the invariant, not a reachable boss-spawn shortcut.
-        for key,kind,row in ((100,EnemyType.ULTROS,2),(101,EnemyType.TYPHON,5)):
+        for key,kind,row in ((100,EnemyType.INKMAW,2),(101,EnemyType.GALEJAW,5)):
             combat.add_enemy(Enemy(key, kind, 7, row));combat.apply_damage(key, 15, 'fixture')
         encounter.boss_wave_spawned = True
         self.assertIs(encounter.outcome(combat), EncounterOutcome.FAILED)
@@ -124,25 +124,22 @@ class CanonicalStageOneTests(unittest.TestCase):
         self.assertTrue(world.encounter.all_spawned)
         self.assertTrue(all(not world.enemies[key].alive for key in world.encounter.definition.mandatory_ids))
 
-    def test_mixed_normal_actions_clear_on_turn_eleven_without_extra_boss_attack(self):
+    def test_mixed_normal_actions_clear_on_turn_ten_without_extra_boss_attack(self):
         world = playing();clear_ordinary_waves(world)
         self.assertEqual((world.hp,world.bp), (100,5))
-        perform_action(world, 'fire', 2)
+        perform_action(world, 'ember_lance', 2)
         self.assertEqual((world.hp,world.mp), (95,70))
         self.assertEqual(world.enemies[100].hp, 0)
         self.assertEqual(world.enemies[101].hp, 15)
-        perform_action(world, 'starstorm', 5)
-        self.assertEqual((world.hp,world.mp), (90,30))
-        self.assertEqual(world.enemies[101].hp, 5)
         hits = perform_action(world, 'shot', 5)
         self.assertTrue(any(event.target_id == 101 and event.damage == 4 for event in hits))
         self.assertIs(world.state, GameState.STAGE_CLEAR)
-        self.assertEqual((world.turn_index,world.hp,world.mp,world.bp), (11,90,30,5))
-        self.assertEqual(world.last_resolved_turn, 10)
+        self.assertEqual((world.turn_index,world.hp,world.mp,world.bp), (10,95,70,5))
+        self.assertEqual(world.last_resolved_turn, 9)
         self.assertEqual(len(world.combat.death_events), 30)
         self.assertEqual(len({event.enemy_id for event in world.combat.death_events}), 30)
         self.assertEqual([event.enemy_id for event in world.combat.death_events[-2:]], [100,101])
-        self.assertEqual(len([e for e in world.status_events if e.source_id == 'boss_attack']), 2)
+        self.assertEqual(len([e for e in world.status_events if e.source_id == 'enemy:101:attack']), 1)
         self.assertFalse(world.resolve_turn())
         self.assertFalse(world.can_advance_stage)
         self.assertFalse(world.advance_stage())
@@ -178,53 +175,7 @@ class CanonicalStageOneTests(unittest.TestCase):
         self.assertFalse(any(enemy.active for enemy in world.enemies.values()))
         self.assertEqual((len(world.combat.death_events),sum(e.escaped for e in world.enemies.values())), (17,11))
 
-    def test_boss_stage_clear_precedes_due_poison_doom_and_hazards(self):
-        world = playing();clear_ordinary_waves(world)
-        perform_action(world, 'fire', 2);perform_action(world, 'starstorm', 5)
-        world.apply_status(StatusKind.POISON, 1)
-        world.apply_status(StatusKind.DOOM, 1)
-        world.place_poison_tile(5)
-        # Make the fixtures due on the final player action.
-        from dataclasses import replace
-        for effect in world.statuses.snapshot():
-            world.statuses.put(replace(effect, applied_turn=world.turn_index-1))
-        tile = world.hazards.snapshot()[0]
-        world.hazards.put(replace(tile, applied_turn=world.turn_index-1))
-        before = world.snapshot()
-        perform_action(world, 'shot', 5)
-        self.assertIs(world.state, GameState.STAGE_CLEAR)
-        self.assertEqual(world.hp, before.hp)
-        self.assertEqual(world.snapshot().statuses, before.statuses)
-        self.assertEqual(world.snapshot().hazards, before.hazards)
 
-    def test_restart_clears_bosses_histories_resources_effects_and_completion_claim(self):
-        world = playing();clear_ordinary_waves(world)
-        perform_action(world, 'fire', 2);perform_action(world, 'starstorm', 5)
-        perform_action(world, 'shot', 5)
-        old = world.encounter
-        world.apply_status(StatusKind.DOOM);world.place_poison_tile(3)
-        self.assertTrue(world.restart())
-        self.assertIs(world.state, GameState.STAGE_INTRO)
-        self.assertEqual((world.stage,world.turn_index,world.hp,world.mp,world.bp), (1,1,100,100,1))
-        self.assertIs(world.encounter.definition, STAGE_ONE)
-        self.assertIsNot(world.encounter, old)
-        self.assertEqual(world.encounter.spawn_history, [])
-        self.assertFalse(world.encounter.boss_wave_spawned)
-        self.assertEqual(world.enemies, {})
-        self.assertEqual(world.combat.death_events, [])
-        self.assertEqual(world.status_events, ())
-        self.assertEqual(world.projectiles, [])
-        self.assertEqual(world.statuses.snapshot(), ())
-        self.assertEqual(world.hazards.snapshot(), ())
-        self.assertFalse(world.reraise_used)
-        self.assertEqual(dict(world.spells.cooldowns), {})
-        self.assertIsNone(world._pending_action)
-        self.assertIsNone(world._cleared_stage)
-        self.assertEqual((world._next_projectile_id,world._next_action_id,world._physics.accumulator), (1,1,0))
-        self.assertIsNone(world.selected_spell)
-        self.assertIsNone(world.last_spell_result)
-        world.transition_to(GameState.PLAYER_AIM)
-        self.assertEqual(list(world.enemies), [1,2,3,4])
 
     def test_restart_after_canonical_defeat_replays_canonical_not_prototype(self):
         world = playing()
@@ -242,7 +193,7 @@ class CanonicalStageOneTests(unittest.TestCase):
             for schedule in ((1/30,), (1/60,), (1/144,), (.004,.041,.009,.024,.005,.017)):
                 world = playing();history = []
                 actions = ([('shot',row) for row in OPENING_ROWS] +
-                           [('fire',2),('starstorm',5),('shot',5)] if scenario == 'clear' else
+                           [('ember_lance',2),('shot',5)] if scenario == 'clear' else
                            [('shot',0)]*19 if scenario == 'HP defeat' else
                            [('shot',row) for row in DEFENSE_ROWS])
                 for kind,row in actions:
@@ -269,10 +220,10 @@ class CanonicalStageOneTests(unittest.TestCase):
             pygame.event.post(pygame.event.Event(pygame.KEYDOWN,key=key))
         for event in pygame.event.get():game.handle_event(event)
         clear_ordinary_waves(game.world,game=game)
-        for kind,row in (('fire',2),('starstorm',5),('shot',5)):
+        for kind,row in (('ember_lance',2),('shot',5)):
             perform_action(game.world,kind,row,game=game)
         self.assertIs(game.world.state, GameState.STAGE_CLEAR)
-        self.assertEqual((game.world.hp,game.world.mp,game.world.bp), (90,30,5))
+        self.assertEqual((game.world.hp,game.world.mp,game.world.bp), (95,70,5))
         before = deepcopy(vars(game.world))
         game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_RETURN))
         self.assertEqual(vars(game.world),before)
@@ -292,19 +243,19 @@ class CanonicalStageOneTests(unittest.TestCase):
                 patch.object(renderer,'hud_font', wraps=renderer.hud_font) as hud_font:
             renderer.draw(screen,snapshot)
             labels=[call.args[0] for call in font.render.call_args_list + hud_font.render.call_args_list]
-            self.assertIn('U15',labels);self.assertIn('T15',labels)
+            self.assertIn('I15',labels);self.assertIn('G15',labels)
         self.assertEqual(vars(world),before)
-        perform_action(world,'fire',2);perform_action(world,'starstorm',5);perform_action(world,'shot',5)
+        perform_action(world,'ember_lance',2);perform_action(world,'shot',5)
         with patch.object(renderer.screens,'_text',wraps=renderer.screens._text) as text:
             renderer.draw(screen,world.snapshot())
             labels=[call.args[1] for call in text.call_args_list]
         self.assertIn('Stage 1 encounter complete',labels)
         self.assertNotIn('Prototype encounter complete',labels)
 
-    def test_meteor_remains_locked_and_selection_does_not_claim_boss_turn(self):
+    def test_skyfall_remains_locked_and_selection_does_not_claim_boss_turn(self):
         world = playing();clear_ordinary_waves(world)
-        self.assertIs(world.validate_spell('meteor').failure,SpellFailure.STAGE_LOCKED)
-        self.assertFalse(world.select_spell('meteor'))
+        self.assertIs(world.validate_spell('skyfall').failure,SpellFailure.STAGE_LOCKED)
+        self.assertFalse(world.select_spell('skyfall'))
         self.assertIsNone(world._pending_action)
         self.assertEqual((world.hp,world.mp,world.turn_index),(100,100,9))
 

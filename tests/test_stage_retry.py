@@ -28,7 +28,7 @@ def fixture_registry(*, stage_two_spawn_col: int = 0):
     data[3]['completion']['mandatory_enemy_ids'].append(3)
     data[3]['boss_wave'] = {
         'when': 'after_scripted_waves_cleared',
-        'spawns': [{'id': 3, 'kind': 'odin', 'col': 0, 'row': 5}],
+        'spawns': [{'id': 3, 'kind': 'iron_regent', 'col': 0, 'row': 5}],
     }
     return {stage: parse_stage(value) for stage, value in data.items()}
 
@@ -61,7 +61,7 @@ class StageRetryTests(unittest.TestCase):
 
     def clear_fixture_stage(self):
         """Use a valid Fire action and the ordinary action resolver."""
-        self.assertTrue(self.world.select_spell('fire'))
+        self.assertTrue(self.world.select_spell('ember_lance'))
         self.assertTrue(self.world.cast_selected_spell().valid)
         self.world.advance_time(.45)
         self.assertTrue(self.world.resolve_turn())
@@ -77,160 +77,8 @@ class StageRetryTests(unittest.TestCase):
             self.key(pygame.K_RETURN)
             self.assertIs(self.world.state, GameState.PLAYER_AIM)
 
-    def test_stage_two_retry_after_consumed_reraise_resets_full_attempt(self):
-        self.advance_to_stage(2)
-        world = self.world
-        old_encounter, old_combat = world.encounter, world.combat
-        self.assertTrue(world.commit_spell('retry-fire-history', 'fire').valid)
-        self.assertTrue(world.execute_support_spell('retry-reraise-grant', 'reraise').valid)
-        self.assertTrue(world.reraise_used)
-        for status in (StatusKind.POISON, StatusKind.BIND, StatusKind.DOOM,
-                       StatusKind.WARD, StatusKind.LEVITATION):
-            world.apply_status(status)
-        world.place_poison_tile(3)
-        world.bp = 4
-        world.player_row = 5
-        world.set_aim_target((96, 336))
-        world._physics.accumulator = .009
 
-        # Exercise the actual unified knockout and revival path before the final defeat.
-        world.force_player_knockout(source='doom')
-        self.assertEqual(world.hp, 50)
-        self.assertFalse(world.statuses.is_active(StatusKind.RERAISE, world.turn_index))
-        self.assertTrue(world.reraise_used)
-        world.set_aim_target((96, 336))
-        self.assertTrue(world.fire())
-        old_projectiles = tuple(world.projectiles)
-        self.assertTrue(old_projectiles)
-        world.force_player_knockout(source='doom')
-        self.assertIs(world.state, GameState.GAME_OVER)
-        self.assertIs(world.game_over_reason, GameOverReason.HP_DEPLETED)
-        self.assertTrue(world.projectiles)  # A terminal transition can retain presentation input.
 
-        epoch = self.game._presentation_epoch
-        self.key(pygame.K_t, repeat=True)
-        self.assertIs(world.state, GameState.GAME_OVER)
-        self.assertEqual(self.game._presentation_epoch, epoch)
-        self.key(pygame.K_t)
-
-        self.assertIs(world.state, GameState.STAGE_INTRO)
-        self.assertEqual((world.stage, world.turn_index, world.hp, world.mp, world.bp),
-                         (2, 1, 100, 100, 1))
-        self.assertEqual(world.player_row, 3)
-        self.assertIsNone(world.aim_target)
-        self.assertEqual(world.projectiles, [])
-        self.assertIsNone(world._pending_action)
-        self.assertEqual(world._physics.accumulator, 0)
-        self.assertEqual(world._spell_remaining, 0)
-        self.assertEqual(world._next_projectile_id, 1)
-        self.assertEqual(world._next_action_id, 1)
-        self.assertIsNone(world.selected_spell)
-        self.assertEqual(world.spell_feedback, '')
-        self.assertIsNone(world.last_spell_result)
-        self.assertEqual(world.statuses.snapshot(), ())
-        self.assertEqual(world.status_events, ())
-        self.assertEqual(world.hazards.snapshot(), ())
-        self.assertFalse(world.reraise_used)
-        self.assertEqual(dict(world.spells.cooldowns), {})
-        self.assertEqual(world.spells._committed_actions, {})
-        self.assertEqual(world.combat.death_events, [])
-        self.assertEqual(world.combat.observations, ())
-        self.assertEqual(world.enemies, {})
-        self.assertEqual(world.crystals, {})
-        self.assertEqual(world.pending_bp, 0)
-        self.assertEqual(world.encounter.spawn_history, [])
-        self.assertEqual(world.encounter.spawned_waves, set())
-        self.assertFalse(world.encounter.boss_wave_spawned)
-        self.assertIsNot(world.encounter, old_encounter)
-        self.assertIsNot(world.combat, old_combat)
-        self.assertFalse(world.can_retry_current_stage)
-        self.assertEqual(self.game._presentation_epoch, epoch + 1)
-
-        # Repeated T cannot leave the intro; Enter is still required for Wave 1.
-        snapshot = world.snapshot()
-        with self.assertRaises(FrozenInstanceError):
-            snapshot.retry_stage_available = True
-        self.key(pygame.K_t)
-        self.assertIs(world.state, GameState.STAGE_INTRO)
-        self.assertEqual(world.encounter.spawn_history, [])
-        self.key(pygame.K_RETURN)
-        self.assertIs(world.state, GameState.PLAYER_AIM)
-        self.assertEqual(world.encounter.spawn_history, [1, 2])
-        self.assertTrue(world.validate_spell('esuna').valid)
-        self.assertTrue(world.validate_spell('levitation').valid)
-        self.assertIs(world.validate_spell('meteor').failure, SpellFailure.STAGE_LOCKED)
-
-    def test_stage_three_retry_after_doom_starts_clean_stage_three_not_victory(self):
-        self.advance_to_stage(3)
-        world = self.world
-        self.assertEqual(world.stage, 3)
-        # Clear the scripted enemy through a valid spell action so Odin really spawns.
-        self.assertTrue(world.select_spell('fire'))
-        self.assertTrue(world.cast_selected_spell().valid)
-        world.advance_time(.45)
-        self.assertTrue(world.resolve_turn())
-        self.assertIs(world.state, GameState.PLAYER_AIM)
-        self.assertTrue(world.encounter.boss_wave_spawned)
-        self.assertEqual([enemy.enemy_type.value for enemy in world.enemies.values()
-                          if enemy.active], ['odin'])
-        world.apply_status(StatusKind.DOOM, 1)
-        world.place_poison_tile(3)
-        world.bp = 5
-        world.mp = 17
-        old_encounter, old_combat = world.encounter, world.combat
-        world.force_player_knockout(source='doom')
-        self.assertIs(world.state, GameState.GAME_OVER)
-        self.assertEqual(world.hp, 0)
-        self.assertIs(world.game_over_reason, GameOverReason.HP_DEPLETED)
-        failed_snapshot = world.snapshot()
-        self.assertTrue(failed_snapshot.retry_stage_available)
-        screen_renderer = ScreenRenderer()
-        with patch.object(screen_renderer, '_text', wraps=screen_renderer._text) as text:
-            screen_renderer.terminal(pygame.Surface((960, 576)), failed_snapshot)
-        labels = [call.args[1] for call in text.call_args_list]
-        self.assertIn('T: Retry Stage 3', labels)
-        self.assertIn('R: Restart Campaign', labels)
-
-        self.key(pygame.K_t)
-        self.assertIs(world.state, GameState.STAGE_INTRO)
-        self.assertEqual((world.stage, world.turn_index, world.hp, world.mp, world.bp),
-                         (3, 1, 100, 100, 1))
-        self.assertEqual(world.enemies, {})
-        self.assertEqual(world.crystals, {})
-        self.assertEqual(world.encounter.spawn_history, [])
-        self.assertFalse(world.encounter.boss_wave_spawned)
-        self.assertIsNot(world.encounter, old_encounter)
-        self.assertIsNot(world.combat, old_combat)
-        self.assertEqual(world.status_events, ())
-        self.assertEqual(world.statuses.snapshot(), ())
-        self.assertEqual(world.hazards.snapshot(), ())
-        self.assertIsNone(world.game_over_reason)
-        self.assertIsNone(world._cleared_stage)
-        self.key(pygame.K_RETURN)
-        self.assertIs(world.state, GameState.PLAYER_AIM)
-        self.assertEqual(world.encounter.spawn_history, [1, 2])
-        self.assertFalse(world.encounter.boss_wave_spawned)
-        self.assertEqual([enemy.enemy_type.value for enemy in world.enemies.values()
-                          if enemy.active], ['basic'])
-        self.assertTrue(world.validate_spell('meteor').valid)
-        self.assertTrue(world.validate_spell('esuna').valid)
-
-    def test_stage_three_r_campaign_key_still_returns_to_stage_one(self):
-        self.advance_to_stage(3)
-        world = self.world
-        world.force_player_knockout(source='odin_execute')
-        self.assertIs(world.state, GameState.GAME_OVER)
-        self.key(pygame.K_r)
-        self.assertIs(world.state, GameState.STAGE_INTRO)
-        self.assertEqual((world.stage, world.turn_index, world.hp, world.mp, world.bp),
-                         (1, 1, 100, 100, 1))
-        self.assertEqual(world.encounter.definition, world.stage_definitions[1])
-        self.assertEqual(world.encounter.spawn_history, [])
-        self.assertEqual(world.enemies, {})
-        self.assertEqual(world.crystals, {})
-        self.key(pygame.K_RETURN)
-        self.assertIs(world.state, GameState.PLAYER_AIM)
-        self.assertIs(world.validate_spell('meteor').failure, SpellFailure.STAGE_LOCKED)
 
     def test_retry_is_unavailable_for_stage_one_and_outside_game_over(self):
         world = self.world
@@ -263,7 +111,7 @@ class StageRetryTests(unittest.TestCase):
         self.game.world = World(stages=fixture_registry(stage_two_spawn_col=13))
         self.advance_to_stage(2)
         world = self.world
-        self.assertTrue(world.select_spell('ward'))
+        self.assertTrue(world.select_spell('barrier'))
         self.assertTrue(world.cast_selected_spell().valid)
         world.advance_time(.45)
         self.assertTrue(world.resolve_turn())
@@ -332,7 +180,7 @@ class StageRetryTests(unittest.TestCase):
 
                 def fire_and_resolve():
                     world = game.world
-                    self.assertTrue(world.select_spell('fire'))
+                    self.assertTrue(world.select_spell('ember_lance'))
                     self.assertTrue(world.cast_selected_spell().valid)
                     frame = 0
                     while world.state is GameState.SPELL_ANIMATION:

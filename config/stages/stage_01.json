@@ -233,13 +233,13 @@
     "spawns": [
       {
         "id": 100,
-        "kind": "ultros",
+        "kind": "inkmaw",
         "col": 7,
         "row": 2
       },
       {
         "id": 101,
-        "kind": "typhon",
+        "kind": "galejaw",
         "col": 7,
         "row": 5
       }

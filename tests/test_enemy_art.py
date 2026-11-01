@@ -21,10 +21,10 @@ from src.world import World
 
 
 NEW_KINDS = (
-    EnemyType.ULTROS, EnemyType.TYPHON, EnemyType.CACTUAR, EnemyType.ALLIGATOR,
-    EnemyType.BULB, EnemyType.MORBOL, EnemyType.LANDTRAP, EnemyType.CHICHU,
-    EnemyType.MANDRAGORA, EnemyType.DIREMITE, EnemyType.TONBERRY,
-    EnemyType.GORGON, EnemyType.ODIN,
+    EnemyType.INKMAW, EnemyType.GALEJAW, EnemyType.NEEDLELING, EnemyType.MARSHMAW,
+    EnemyType.SPOREBUD, EnemyType.MAWROOT, EnemyType.SNAPROOT, EnemyType.BRIARHEART,
+    EnemyType.ROOTLING, EnemyType.VENOMCRAWLER, EnemyType.HOODED_STALKER,
+    EnemyType.THORN_SENTINEL, EnemyType.IRON_REGENT,
 )
 
 
@@ -179,7 +179,7 @@ class EnemyArtTests(unittest.TestCase):
     def test_mixed_art_and_fallback_only_replace_the_unavailable_kind(self):
         source = runpy.run_path(str(ASSET_ROOT / 'generate_enemies.py'))
         source['generate'](self.root)
-        (self.root / ENEMY_SPRITES[EnemyType.ODIN].path).unlink()
+        (self.root / ENEMY_SPRITES[EnemyType.IRON_REGENT].path).unlink()
         with self.assertLogs('src.assets', level='WARNING'):
             renderer = Renderer(AssetManager(self.root))
         world = roster()
@@ -187,7 +187,7 @@ class EnemyArtTests(unittest.TestCase):
         renderer.draw(self.screen, world.snapshot())
         for kind in NEW_KINDS:
             self.assertEqual(renderer.assets.load_image(ENEMY_SPRITES[kind].path).is_fallback,
-                             kind is EnemyType.ODIN)
+                             kind is EnemyType.IRON_REGENT)
         self.assertEqual(vars(world), before)
 
 

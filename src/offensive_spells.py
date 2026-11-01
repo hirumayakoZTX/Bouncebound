@@ -16,9 +16,8 @@ from src.spells import (
 
 
 OFFENSIVE_DAMAGE: Mapping[SpellId, int] = MappingProxyType({
-    SpellId.FIRE: 20,
-    SpellId.STARSTORM: 10,
-    SpellId.METEOR: 15,
+    SpellId.EMBER_LANCE: 20,
+    SpellId.SKYFALL: 15,
 })
 
 

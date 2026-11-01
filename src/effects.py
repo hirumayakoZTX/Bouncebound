@@ -33,10 +33,9 @@ TERMINALS = frozenset({GameState.STAGE_CLEAR, GameState.GAME_OVER, GameState.VIC
 CUE_FILES = {name: f'sounds/{name}.wav' for name in
              ('shoot', 'bounce', 'hit', 'death', 'spellcast', 'damage', 'victory', 'defeat')}
 ORB_COLORS = ((255, 223, 130), (124, 221, 255), (198, 175, 255), (146, 239, 180), (255, 178, 155))
-SPELL_COLORS = {SpellId.FIRE: (255, 164, 91), SpellId.STARSTORM: (167, 190, 255),
-                SpellId.METEOR: (239, 159, 133), SpellId.CURE: (139, 236, 163),
-                SpellId.ESUNA: (182, 230, 252), SpellId.LEVITATION: (149, 220, 238),
-                SpellId.WARD: (132, 194, 255), SpellId.RERAISE: (255, 219, 147)}
+SPELL_COLORS = {SpellId.EMBER_LANCE: (255, 164, 91),
+                SpellId.SKYFALL: (239, 159, 133), SpellId.MEND: (139, 236, 163),
+                SpellId.CLEANSE: (182, 230, 252), SpellId.BARRIER: (132, 194, 255)}
 
 
 @dataclass(frozen=True)
@@ -184,14 +183,14 @@ class FeedbackLayer:
                 targets = tuple(positions[i] for i in cast.targets.enemy_ids if i in positions)
                 position = cast.targets.center or snapshot.player_position
                 label = ''
-                if cast.spell_id is SpellId.CURE:
+                if cast.spell_id is SpellId.MEND:
                     label = f'+{result.effects.healed} HP'
-                elif cast.spell_id is SpellId.ESUNA:
+                elif cast.spell_id is SpellId.CLEANSE:
                     label = f'Cleansed {len(result.effects.removed)}'
                 self._emit('spell:' + cast.spell_id.value, position, assets=assets, cue='spellcast',
                            duration=.45, targets=targets, radius=cast.targets.radius or 0,
-                           label=label, status_kind=(StatusKind(cast.spell_id.value)
-                           if cast.spell_id in (SpellId.WARD, SpellId.LEVITATION, SpellId.RERAISE) else None))
+                           label=label, status_kind=(StatusKind.WARD
+                           if cast.spell_id is SpellId.BARRIER else None))
         for event in fresh:
             if event.kind == 'death':
                 kind = 'explosion' if event.enemy_type is EnemyType.BOMB else 'death'
@@ -209,20 +208,14 @@ class FeedbackLayer:
             self._status_cursor = 0
         for event in snapshot.status_events[self._status_cursor:]:
             values = dict(assets=assets)
-            if event.kind in (StatusEventType.DAMAGE, StatusEventType.POISON_DAMAGE, StatusEventType.HAZARD_DAMAGE):
+            if event.kind in (StatusEventType.DAMAGE, StatusEventType.POISON_DAMAGE):
                 if event.amount > 0:
-                    prefix = 'Poison ' if event.kind is StatusEventType.POISON_DAMAGE else 'Tile ' if event.kind is StatusEventType.HAZARD_DAMAGE else ''
+                    prefix = 'Poison ' if event.kind is StatusEventType.POISON_DAMAGE else ''
                     self._emit('damage', snapshot.player_position, label=f'{prefix}-{event.amount}', cue='damage', **values)
             elif event.kind is StatusEventType.WARD_BLOCKED:
                 self._emit('ward_block', snapshot.player_position, label='BLOCK', **values)
-            elif event.kind is StatusEventType.LEVITATION_BLOCKED:
-                self._emit('floor_block', snapshot.player_position, label='FLOOR SAFE', **values)
-            elif event.kind is StatusEventType.RERAISE_ACTIVATED:
-                self._emit('revive', snapshot.player_position, label=f'REVIVE +{event.amount}', duration=.65, **values)
-            elif event.kind is StatusEventType.FORCED_KNOCKOUT:
-                # Revival is already resolved; never show a terminal defeat here.
-                self._emit('warning', snapshot.player_position, label='EXECUTE' if event.source_id == 'odin_execute' else 'DOOM', **values)
-            elif event.kind in (StatusEventType.APPLIED, StatusEventType.REFRESHED) and event.status in (StatusKind.POISON, StatusKind.BIND, StatusKind.DOOM):
+            elif (event.kind in (StatusEventType.APPLIED, StatusEventType.REFRESHED)
+                  and event.status is StatusKind.POISON):
                 self._emit('warning', snapshot.player_position, label=event.status.name, status_kind=event.status, **values)
         self._status_cursor = len(snapshot.status_events)
         if old is not None:
@@ -301,38 +294,28 @@ class FeedbackLayer:
                     label_slots[anchor] = slot + 1
             if kind.startswith('spell:'):
                 spell = SpellId(kind.split(':')[1]); color = SPELL_COLORS[spell]
-                if spell is SpellId.FIRE:
+                if spell is SpellId.EMBER_LANCE:
                     for target in effect.targets:
                         pygame.draw.line(screen, color, (824, y), target, width=2)
                         pygame.draw.circle(screen, color, target, radius, width=2)
-                elif spell is SpellId.STARSTORM:
-                    pygame.draw.circle(screen, color, (round(x), round(y)), round(effect.radius), width=1)
-                    for angle in range(5):
-                        a = angle * 2*pi/5 + progress*.3
-                        point = (round(x+cos(a)*effect.radius*.6), round(y+sin(a)*effect.radius*.6))
-                        pygame.draw.rect(screen, color, (*point, 4, 4))
-                elif spell is SpellId.METEOR:
+                elif spell is SpellId.SKYFALL:
                     for tx, ty in effect.targets:
                         offset = round((1-progress)*25)
                         pygame.draw.line(screen, color, (tx+offset, ty-offset), (tx, ty), width=3)
                         pygame.draw.circle(screen, color, (round(tx), round(ty)), radius, width=1)
-                elif spell is SpellId.CURE:
+                elif spell is SpellId.MEND:
                     pygame.draw.rect(screen, color, (x-3, y-16, 6, 32))
                     pygame.draw.rect(screen, color, (x-16, y-3, 32, 6))
-                elif spell is SpellId.LEVITATION:
-                    for offset in (18, 26):
-                        pygame.draw.line(screen, color, (x-18, y+offset), (x+18, y+offset), width=2)
-                    pygame.draw.polygon(screen, color, ((x-6,y-22),(x,y-30),(x+6,y-22)), width=2)
-                elif spell is SpellId.WARD:
+                elif spell is SpellId.BARRIER:
                     pygame.draw.polygon(screen, color, ((x,y-28),(x+24,y-14),(x+20,y+18),
                                                         (x,y+30),(x-20,y+18),(x-24,y-14)), width=2)
-                elif spell is SpellId.RERAISE:
-                    pygame.draw.ellipse(screen, color, (x-21,y-28,42,12), width=2)
-                    pygame.draw.rect(screen, color, (x-2,y-10,4,20))
-                    pygame.draw.rect(screen, color, (x-10,y-2,20,4))
+                elif spell is SpellId.CLEANSE:
+                    for index in range(4):
+                        px = x - 12 + index * 8
+                        pygame.draw.rect(screen, color, (px, y - 12 + (index % 2) * 8, 4, 4))
                 else:
                     pygame.draw.polygon(screen, color, ((x,y-24),(x+24,y),(x,y+24),(x-24,y)), width=2)
-                label(effect.label or ('Reraise ready' if spell is SpellId.RERAISE else ''))
+                label(effect.label)
             elif kind == 'explosion':
                 color = (255, 161, 102)
                 for col in (-1,0,1):
@@ -341,12 +324,9 @@ class FeedbackLayer:
                         if (col or row) and 120 <= cx <= 744 and 96 <= cy <= 432:
                             pygame.draw.rect(screen, color, (cx-22,cy-22,44,44), width=1)
                 pygame.draw.circle(screen, color, (round(x),round(y)), radius+12, width=2)
-            elif kind in ('ward_block', 'floor_block', 'revive', 'damage', 'warning'):
-                color = (149, 222, 255) if kind in ('ward_block','floor_block') else (154, 238, 183) if kind=='revive' else (255, 172, 155)
-                if kind == 'floor_block':
-                    pygame.draw.line(screen, color, (x-22,y+23),(x+22,y+23),width=3)
-                else:
-                    pygame.draw.rect(screen, color, (x-24,y-24,48,48),width=2)
+            elif kind in ('ward_block', 'damage', 'warning'):
+                color = (149, 222, 255) if kind == 'ward_block' else (255, 172, 155)
+                pygame.draw.rect(screen, color, (x-24,y-24,48,48),width=2)
                 label(effect.label)
             else:
                 color = (255, 173, 151) if kind in ('hit','death','defeat') else (144, 230, 205) if kind in ('crystal','clear') else color
